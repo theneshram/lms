@@ -1,8 +1,7 @@
 FROM node:20-alpine
-WORKDIR /app
+WORKDIR /usr/src/app
 COPY package*.json ./
-# Use lockfile when available; fall back otherwise
-RUN if [ -f package-lock.json ]; then npm ci --omit=dev || npm i --omit=dev; else npm i --omit=dev; fi
-COPY . .
+RUN npm ci --omit=dev
+COPY src ./src
 EXPOSE 8080
-CMD ["node","src/index.js"]
+CMD ["node", "src/index.js"]

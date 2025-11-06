@@ -1,32 +1,25 @@
 import { Router } from 'express';
-import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import { config } from '../config.js';
 import User from '../models/User.js';
+import { asyncHandler } from '../utils/error.js';
 
 const router = Router();
 
-router.post('/register', async (req, res) => {
-  try {
-    const { name, email, password, role } = req.body;
-    if (!name || !email || !password || !role) return res.status(400).json({ error: 'Missing fields' });
-    const exists = await User.findOne({ email });
-    if (exists) return res.status(409).json({ error: 'Email already registered' });
-    const passwordHash = await bcrypt.hash(password, 10);
-    const user = await User.create({ name, email, passwordHash, role });
-    return res.status(201).json({ id: user._id });
-  } catch (e) {
-    return res.status(500).json({ error: e.message });
-  }
-});
+router.post('/register', asyncHandler(async (req, res) => {
+  const { name, email, password, role } = req.body;
+  const exists = await User.findOne({ email });
+  if (exists) return res.status(409).json({ message: 'Email in use' });
+  const user = await User.create({ name, email, password, role });
+  res.json({ id: user._id });
+}));
 
-router.post('/login', async (req, res) => {
+router.post('/login', asyncHandler(async (req, res) => {
   const { email, password } = req.body;
-  const user = await User.findOne({ email });
-  if (!user) return res.status(401).json({ error: 'Invalid credentials' });
-  const ok = await bcrypt.compare(password, user.passwordHash);
-  if (!ok) return res.status(401).json({ error: 'Invalid credentials' });
-  const token = jwt.sign({ id: user._id, role: user.role, name: user.name }, process.env.JWT_SECRET, { expiresIn: '12h' });
-  return res.json({ token, role: user.role, name: user.name });
-});
+  const user = await User.findOne({ email }).select('+password');
+  if (!user || !(await user.compare(password))) return res.status(401).json({ message: 'Invalid credentials' });
+  const token = jwt.sign({ id: user._id, role: user.role }, config.jwtSecret, { expiresIn: '7d' });
+  res.json({ token, user: { id: user._id, name: user.name, role: user.role, email: user.email } });
+}));
 
 export default router;

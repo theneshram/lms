@@ -1,37 +1,47 @@
-services:
-  db:
-    image: mongo:7
-    container_name: lms-db
-    restart: unless-stopped
-    ports:
-      - "27017:27017"
-    volumes:
-      - mongo_data:/data/db
-
-  api:
-    build: ./apps/api
-    container_name: lms-backend
-    restart: unless-stopped
-    depends_on:
-      - db
-    environment:
-      - PORT=8080
-      - MONGO_URI=mongodb://db:27017/lms
-      - JWT_SECRET=please_change_me
-      - CORS_ORIGIN=http://localhost:3000
-    ports:
+version: "3.9"
+services:
+  db:
+    image: mongo:6
+    container_name: lms-db
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_DATABASE: lms
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build: ./apps/api
+    container_name: lms-api
+    env_file: .env
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
       - "8080:8080"
-
-  web:
-    build: ./apps/web
-    container_name: lms-frontend
-    restart: unless-stopped
-    environment:
-      - VITE_API_BASE=http://localhost:8080/api
-    ports:
-      - "3000:3000"
-    depends_on:
-      - api
-
-volumes:
+    volumes:
+      - ./apps/api/src:/usr/src/app/src
+      - ./apps/api/package.json:/usr/src/app/package.json
+      - ./apps/api/package-lock.json:/usr/src/app/package-lock.json
+
+  web:
+    build: ./apps/web
+    container_name: lms-web
+    environment:
+      - VITE_API_BASE=http://localhost:8080/api
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./apps/web/src:/usr/src/app/src
+      - ./apps/web/index.html:/usr/src/app/index.html
+      - ./apps/web/tailwind.config.cjs:/usr/src/app/tailwind.config.cjs
+      - ./apps/web/postcss.config.cjs:/usr/src/app/postcss.config.cjs
+      - ./apps/web/tsconfig.json:/usr/src/app/tsconfig.json
+
+volumes:
   mongo_data:

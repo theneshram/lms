@@ -1,9 +1,8 @@
 import mongoose from 'mongoose';
+import { config } from './config.js';
 
 export async function connectDB() {
-  const uri = process.env.MONGO_URI;
-  if (!uri) throw new Error('MONGO_URI not set');
   mongoose.set('strictQuery', true);
-  await mongoose.connect(uri, { autoIndex: true });
-  console.log('Mongo connected');
+  await mongoose.connect(config.mongoUri);
+  console.log('✅ Mongo connected');
 }
