@@ -1,0 +1,119 @@
+/* ------------------------------
+   🔹 DARK DASHBOARD THEME
+   inspired by Dashify design
+--------------------------------*/
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ---------- Color Variables ---------- */
+:root {
+  /* Base surfaces */
+  --bg: 14 16 32;          /* #0E1020 */
+  --surface: 25 27 46;     /* #191B2E */
+  --card: 31 32 54;        /* #1F2036 */
+  --overlay: 41 39 71;     /* #292747 */
+
+  /* Text */
+  --text: 230 230 240;     /* #E6E6F0 */
+  --muted: 164 167 190;    /* #A4A7BE */
+  --subtle: 130 134 160;   /* #8286A0 */
+
+  /* Brand / accents */
+  --primary: 138 43 226;   /* #8A2BE2  (violet) */
+  --primary-600: 120 36 198;
+  --accent: 255 106 61;    /* #FF6A3D  (orange) */
+  --accent-600: 224 83 43;
+
+  /* Status */
+  --success: 56 189 148;
+  --warning: 245 158 11;
+  --danger: 239 68 68;
+
+  /* Borders / lines */
+  --line: 55 58 83;
+
+  /* Glows */
+  --glow-violet: 138 43 226;
+  --glow-orange: 255 106 61;
+}
+
+/* Optional Light Theme */
+.theme-light {
+  --bg: 246 248 255;
+  --surface: 238 241 251;
+  --card: 255 255 255;
+  --overlay: 234 238 251;
+  --text: 23 25 44;
+  --muted: 103 108 133;
+  --subtle: 143 148 173;
+  --line: 222 226 240;
+}
+
+/* ---------- Page Background ---------- */
+body {
+  @apply text-text;
+  background:
+    radial-gradient(1200px 600px at 20% -10%, rgba(var(--glow-violet),0.15), transparent 60%),
+    radial-gradient(900px 500px at 85% 10%, rgba(var(--glow-orange),0.12), transparent 60%),
+    linear-gradient(180deg, #0d0f20 0%, #0b0c18 100%);
+  background-attachment: fixed;
+  color: rgb(var(--text));
+  min-height: 100vh;
+  font-family: 'Inter', sans-serif;
+}
+
+/* ---------- Reusable UI Components ---------- */
+
+/* Use with @apply in component .jsx className or as plain CSS class */
+
+.card-base {
+  @apply bg-card/95 border border-line/40 rounded-2xl shadow-card shadow-inset;
+  backdrop-filter: blur(8px);
+}
+
+.sidebar-base {
+  @apply bg-surface/95 border-r border-line/40;
+  backdrop-filter: blur(10px);
+}
+
+.btn-primary {
+  @apply bg-primary hover:bg-primary-600 text-white rounded-xl px-4 py-2 font-medium transition;
+  box-shadow: 0 0 0.5rem rgba(var(--glow-violet),0.35);
+}
+
+.btn-accent {
+  @apply bg-accent hover:bg-accent-600 text-white rounded-xl px-4 py-2 font-medium transition;
+  box-shadow: 0 0 0.5rem rgba(var(--glow-orange),0.35);
+}
+
+.input-dark {
+  @apply bg-overlay/60 border border-line/40 rounded-xl px-3 py-2 text-text placeholder:text-subtle;
+}
+
+.kpi {
+  @apply text-3xl font-semibold text-white;
+}
+
+.kpi-label {
+  @apply text-sm text-muted;
+}
+
+/* ---------- Scrollbar (optional aesthetic) ---------- */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: rgba(var(--card),0.4);
+}
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, rgb(var(--primary)), rgb(var(--accent)));
+  border-radius: 8px;
+}
+
+/* ---------- Animation / Glow ---------- */
+.glow-border {
+  box-shadow: 0 0 8px rgba(var(--glow-violet),0.3),
+              0 0 16px rgba(var(--glow-orange),0.2);
+}

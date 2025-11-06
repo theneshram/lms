@@ -1,55 +1,40 @@
-import React, { useEffect, useState } from "react";
-import { api } from "./api";
+import { BrowserRouter, Routes, Route, Link } from 'react-router-dom';
+import ProtectedRoute from './components/ProtectedRoute.jsx';
+import Login from './pages/Login.jsx';
+import Dashboard from './pages/Dashboard.jsx';
+import Courses from './pages/Courses.jsx';
+import CourseView from './pages/CourseView.jsx';
+import { useAuth } from './context/AuthContext.jsx';
 
-export default function App() {
-  const [health, setHealth] = useState(null);
-  const [courses, setCourses] = useState([]);
-  const [form, setForm] = useState({ title: "", code: "" });
-
-  useEffect(() => {
-    api.health().then(setHealth);
-    api.listCourses().then(setCourses);
-  }, []);
-
-  const submit = async (e) => {
-    e.preventDefault();
-    if (!form.title || !form.code) return;
-    const created = await api.addCourse(form);
-    setCourses((c) => [...c, created]);
-    setForm({ title: "", code: "" });
-  };
-
+function Nav(){
+  const { user, logout } = useAuth();
   return (
-    <div style={{ padding: 24, fontFamily: "system-ui" }}>
-      <h1>LMS Frontend</h1>
-      <p>
-        API health:{" "}
-        <code>{health ? JSON.stringify(health) : "Checking..."}</code>
-      </p>
+    <nav className='flex items-center justify-between p-3 border-b border-line/40'>
+      <div className='flex items-center gap-4'>
+        <Link to='/' className='bg-brand-gradient text-white rounded-xl px-3 py-1 shadow-glow'>LMS</Link>
+        {user && (<Link to='/courses' className='text-muted hover:text-white'>Courses</Link>)}
+      </div>
+      <div>
+        {user ? (
+          <button onClick={logout} className='btn-accent'>Logout</button>
+        ) : (
+          <Link to='/login' className='btn-primary'>Login</Link>
+        )}
+      </div>
+    </nav>
+  );
+}
 
-      <h2>Courses</h2>
-      <ul>
-        {courses.map((c) => (
-          <li key={c.id}>
-            <strong>{c.code}</strong> — {c.title}
-          </li>
-        ))}
-      </ul>
-
-      <h3>Add Course</h3>
-      <form onSubmit={submit} style={{ display: "grid", gap: 8, maxWidth: 360 }}>
-        <input
-          placeholder="Title"
-          value={form.title}
-          onChange={(e) => setForm({ ...form, title: e.target.value })}
-        />
-        <input
-          placeholder="Code (unique)"
-          value={form.code}
-          onChange={(e) => setForm({ ...form, code: e.target.value })}
-        />
-        <button type="submit">Add</button>
-      </form>
-    </div>
+export default function App(){
+  return (
+    <BrowserRouter>
+      <Nav />
+      <Routes>
+        <Route path='/login' element={<Login />} />
+        <Route path='/' element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+        <Route path='/courses' element={<ProtectedRoute roles={["admin","teacher","ta","student"]}><Courses /></ProtectedRoute>} />
+        <Route path='/course' element={<ProtectedRoute roles={["admin","teacher","ta","student"]}><CourseView /></ProtectedRoute>} />
+      </Routes>
+    </BrowserRouter>
   );
 }
