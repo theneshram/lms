@@ -9,6 +9,7 @@ import courseRoutes from './routes/courses.js';
 import assignmentRoutes from './routes/assignments.js';
 import quizRoutes from './routes/quizzes.js';
 import submissionRoutes from './routes/submissions.js';
+import adminRoutes from './routes/admin.js';
 
 const app = express();
 app.use(cors({ origin: config.corsOrigin, credentials: true }));
@@ -21,6 +22,7 @@ app.use('/api/courses', courseRoutes);
 app.use('/api/assignments', assignmentRoutes);
 app.use('/api/quizzes', quizRoutes);
 app.use('/api/submissions', submissionRoutes);
+app.use('/api/admin', adminRoutes);   
 
 app.use((err, req, res, next) => {
   console.error(err);
@@ -28,5 +30,5 @@ app.use((err, req, res, next) => {
 });
 
 connectDB().then(()=>{
-  app.listen(config.port, ()=> console.log(🚀 API on :));
+  app.listen(config.port, () => console.log(`🚀 API running on port ${config.port}`));
 });

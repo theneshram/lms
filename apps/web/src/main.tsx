@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { createBrowserRouter, RouterProvider } from 'react-router-dom';
 import './styles/index.css';
@@ -23,9 +23,9 @@ const router = createBrowserRouter([
   { path: '/courses', element: <ProtectedRoute><Courses/></ProtectedRoute> },
   { path: '/courses/:id', element: <ProtectedRoute><CourseView/></ProtectedRoute> },
   { path: '/courses/:id/assignments', element: <ProtectedRoute><Assignments/></ProtectedRoute> },
-  { path: '/assignments/:id/submit', element: <ProtectedRoute allow={[""STUDENT""]}><AssignmentSubmit/></ProtectedRoute> },
-  { path: '/quizzes/:id/take', element: <ProtectedRoute allow={[""STUDENT""]}><QuizTake/></ProtectedRoute> },
-  { path: '/admin', element: <ProtectedRoute allow={[""ADMIN""]}><AdminSettings/></ProtectedRoute> },
+  { path: '/assignments/:id/submit', element: <ProtectedRoute allow={["STUDENT"]}><AssignmentSubmit/></ProtectedRoute> },
+  { path: '/quizzes/:id/take', element: <ProtectedRoute allow={["STUDENT"]}><QuizTake/></ProtectedRoute> },
+  { path: '/admin', element: <ProtectedRoute allow={["ADMIN"]}><AdminSettings/></ProtectedRoute> },
 ]);
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
