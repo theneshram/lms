@@ -1,19 +1,34 @@
 import mongoose from 'mongoose';
 
-const QuestionSchema = new mongoose.Schema({
-  type: { type: String, enum: ['MCQ','MSQ','TRUE_FALSE','SHORT'], default: 'MCQ' },
-  prompt: { type: String, required: true },
-  options: [String],
-  answer: mongoose.Schema.Types.Mixed,
-  points: { type: Number, default: 1 }
-});
+const QuizSettingsSchema = new mongoose.Schema({
+  durationMinutes: Number,
+  maxAttempts: { type: Number, default: 1 },
+  negativeMarking: { type: Boolean, default: false },
+  negativeMarkValue: { type: Number, default: 0 },
+  gradingScale: { type: String, enum: ['POINTS', 'PERCENTAGE'], default: 'POINTS' },
+  secureMode: { type: Boolean, default: false },
+  autoSubmit: { type: Boolean, default: true },
+}, { _id: false });
+
+const QuizQuestionSchema = new mongoose.Schema({
+  questionId: { type: mongoose.Schema.Types.ObjectId },
+  override: mongoose.Schema.Types.Mixed,
+}, { _id: false });
 
 const QuizSchema = new mongoose.Schema({
   course: { type: mongoose.Schema.Types.ObjectId, ref: 'Course', index: true },
   title: { type: String, required: true },
-  durationMinutes: Number,
-  questions: [QuestionSchema],
-  published: { type: Boolean, default: false }
+  description: String,
+  bank: { type: mongoose.Schema.Types.ObjectId, ref: 'QuestionBank' },
+  questions: [QuizQuestionSchema],
+  randomize: { type: Boolean, default: false },
+  questionCount: Number,
+  settings: { type: QuizSettingsSchema, default: () => ({}) },
+  published: { type: Boolean, default: false },
+  schedule: {
+    openAt: Date,
+    closeAt: Date,
+  },
 }, { timestamps: true });
 
 export default mongoose.model('Quiz', QuizSchema);
