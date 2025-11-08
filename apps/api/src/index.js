@@ -23,6 +23,7 @@ import gamificationRoutes from './routes/gamification.js';
 import ecommerceRoutes from './routes/ecommerce.js';
 import publicRoutes from './routes/public.js';
 import { startNotificationScheduler } from './services/notificationScheduler.js';
+import { ensureSuperAdmin } from './utils/bootstrap.js';
 
 const app = express();
 app.use(cors({ origin: config.corsOrigin, credentials: true }));
@@ -54,7 +55,16 @@ app.use((err, req, res, next) => {
   res.status(500).json({ message: 'Server error' });
 });
 
-connectDB().then(() => {
-  startNotificationScheduler();
-  app.listen(config.port, () => console.log(`🚀 API running on port ${config.port}`));
-});
+async function start() {
+  try {
+    await connectDB();
+    await ensureSuperAdmin(config.admin);
+    startNotificationScheduler();
+    app.listen(config.port, () => console.log(`🚀 API running on port ${config.port}`));
+  } catch (error) {
+    console.error('[bootstrap] Failed to start API', error);
+    process.exit(1);
+  }
+}
+
+start();
