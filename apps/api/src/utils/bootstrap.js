@@ -10,7 +10,7 @@ export async function ensureSuperAdmin(adminConfig = {}) {
     return;
   }
 
-  const existing = await User.findOne({ email });
+  const existing = await User.findOne({ email }).select('+password');
   if (!existing) {
     await User.create({ name, email, password, role: 'ADMIN', status: 'ACTIVE' });
     console.log(`[bootstrap] created super admin account for ${email}`);
@@ -18,6 +18,7 @@ export async function ensureSuperAdmin(adminConfig = {}) {
   }
 
   let updated = false;
+  let passwordRefreshed = false;
   if (existing.role !== 'ADMIN') {
     existing.role = 'ADMIN';
     updated = true;
@@ -26,9 +27,35 @@ export async function ensureSuperAdmin(adminConfig = {}) {
     existing.status = 'ACTIVE';
     updated = true;
   }
+  if (existing.name !== name) {
+    existing.name = name;
+    updated = true;
+  }
+
+  if (password) {
+    const hasPassword = typeof existing.password === 'string' && existing.password.length > 0;
+    let matches = false;
+    if (hasPassword) {
+      try {
+        matches = await existing.compare(password);
+      } catch (err) {
+        matches = false;
+      }
+    }
+
+    if (!matches) {
+      existing.password = password;
+      passwordRefreshed = true;
+      updated = true;
+    }
+  }
 
   if (updated) {
     await existing.save();
-    console.log(`[bootstrap] ensured super admin privileges for ${email}`);
+    console.log(
+      `[bootstrap] ensured super admin privileges for ${email}${passwordRefreshed ? ' (password refreshed)' : ''}`
+    );
+  } else {
+    console.log(`[bootstrap] super admin already configured for ${email}`);
   }
 }
