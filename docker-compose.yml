@@ -18,7 +18,16 @@ services:
   api:
     build: ./apps/api
     container_name: lms-api
-    env_file: .env
+    # ✅ point to the API env file (NOT project root)
+    env_file:
+      - ./apps/api/.env
+    environment:
+      # Helpful hint for config to pick docker host
+      - IN_DOCKER=true
+      # If you want local docker Mongo instead of Atlas, uncomment these:
+      # - MONGO_URI=mongodb://db:27017
+      # - MONGO_DB=lms
+      # - CORS_ORIGIN=http://localhost:5173
     depends_on:
       db:
         condition: service_healthy
@@ -33,7 +42,8 @@ services:
     build: ./apps/web
     container_name: lms-web
     environment:
-      - VITE_API_BASE=http://localhost:8080/api
+      # ✅ make this match what your code reads
+      - VITE_API_URL=http://localhost:8080/api
     ports:
       - "5173:5173"
     volumes:

@@ -1,50 +1,97 @@
-// Run: node apps/api/scripts/create-admin.mjs --email admin@lms.com --password StrongP@ss! --name "Site Admin"
+// Usage examples:
+// 1) With .env (MONGO_URI set):
+//    node apps/api/scripts/create-admin.mjs --email admin@lms.com --password "Admin@123" --name "Site Admin"
+//
+// 2) Passing Atlas URI directly (recommended if you're confused about env):
+//    node apps/api/scripts/create-admin.mjs --mongo-uri "mongodb+srv://thenesh26_db_user:<db_password>@cluster0.mjs1u6c.mongodb.net/?appName=Cluster0" --db lms --email admin@lms.com --password "Admin@123" --name "Site Admin"
+//
+// Notes:
+// - If your password has special characters (@, #, :, /, ?), URL-encode it.
+// - Default DB name = "lms" (override with --db <name>)
 
 import 'dotenv/config';
 import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
 
-// If you already have these in your codebase, reuse them:
-import { connectDB } from '../src/db.js';
-import User from '../src/models/User.js'; // Adjust path if your User model differs
-
-function arg(name, fallback) {
-  const idx = process.argv.indexOf(`--${name}`);
-  return idx !== -1 && process.argv[idx + 1] ? process.argv[idx + 1] : fallback;
+// Try to reuse your repo's DB helper if it exists
+let connectDB = null;
+try {
+  ({ connectDB } = await import('../src/db.js')); // keep if your file exists
+} catch (_) {
+  // ignore if not found
 }
 
-const email = arg('email', process.env.ADMIN_EMAIL || 'admin@lms.com');
-const password = arg('password', process.env.ADMIN_PASSWORD || 'ChangeMe!123');
-const name = arg('name', process.env.ADMIN_NAME || 'Administrator');
-const role = arg('role', 'admin');
+// === Adjust this import if your model filename differs ===
+import User from '../src/models/User.js';
+
+// ---------- helpers ----------
+function getArg(flag, fallback) {
+  const i = process.argv.indexOf(`--${flag}`);
+  return i !== -1 && process.argv[i + 1] ? process.argv[i + 1] : (fallback ?? null);
+}
+
+function validateEmail(email) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
+// ---------- inputs ----------
+const email = getArg('email', process.env.ADMIN_EMAIL || 'admin@lms.com');
+const plainPassword = getArg('password', process.env.ADMIN_PASSWORD || 'Pass$$123');
+const name = getArg('name', process.env.ADMIN_NAME || 'Administrator');
+const role = getArg('role', 'admin');
+
+// You can pass the Atlas URI from CLI or via .env
+const mongoUriFromCli = getArg('mongo-uri', null);
+const mongoUri = mongoUriFromCli || process.env.MONGO_URI || null;
+const dbName = getArg('db', process.env.MONGO_DB || 'lms');
+
+// ---------- validations ----------
+if (!validateEmail(email)) {
+  console.error('❌ Invalid --email provided.');
+  process.exit(1);
+}
+if (!plainPassword || plainPassword.length < 8) {
+  console.error('❌ --password must be at least 8 characters.');
+  process.exit(1);
+}
+
+async function connect() {
+  // Priority: explicit URI (CLI or env) → connectDB helper → error
+  if (mongoUri) {
+    await mongoose.connect(mongoUri, { dbName });
+    return;
+  }
+  if (typeof connectDB === 'function') {
+    await connectDB(); // your helper should use .env internally
+    return;
+  }
+  throw new Error('No Mongo URI available. Provide --mongo-uri or set MONGO_URI in .env, or ensure connectDB() exists.');
+}
 
 (async () => {
   try {
-    // Connect using your existing helper (preferred) or fallback to MONGO_URI
-    if (typeof connectDB === 'function') {
-      await connectDB();
-    } else {
-      await mongoose.connect(process.env.MONGO_URI, { dbName: process.env.MONGO_DB || undefined });
-    }
+    await connect();
 
-    let user = await User.findOne({ email });
-    const hash = await bcrypt.hash(password, 10);
+    const hash = await bcrypt.hash(plainPassword, 10);
 
-    if (!user) {
-      user = await User.create({ name, email, password: hash, role });
-      console.log('✅ Admin created:', { id: user._id.toString(), email, role });
-    } else {
-      // If user exists, just ensure they’re admin and reset password
-      user.password = hash;
-      user.role = role;
-      user.name = name || user.name;
-      await user.save();
-      console.log('✅ Admin updated (password reset):', { id: user._id.toString(), email, role });
-    }
+    const admin = await User.findOneAndUpdate(
+      { email },
+      { $set: { name, email, password: hash, role, isActive: true } },
+      { upsert: true, new: true }
+    );
+
+    console.log('✅ Admin ready:', {
+      id: admin._id.toString(),
+      email: admin.email,
+      role: admin.role,
+      name: admin.name,
+      db: dbName
+    });
+    process.exit(0);
   } catch (err) {
-    console.error('❌ Failed to create/update admin:', err);
+    console.error('❌ Failed to create/update admin:', err?.message || err);
     process.exit(1);
   } finally {
-    await mongoose.connection.close().catch(() => {});
+    try { await mongoose.connection.close(); } catch {}
   }
 })();
