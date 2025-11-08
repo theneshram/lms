@@ -14,4 +14,10 @@ export const config = {
 
   jwtSecret: process.env.JWT_SECRET || 'dev_secret',
   corsOrigin: process.env.CORS_ORIGIN || 'http://localhost:5173',
+
+  admin: {
+    email: process.env.ADMIN_EMAIL,
+    password: process.env.ADMIN_PASSWORD,
+    name: process.env.ADMIN_NAME || 'Super Admin',
+  },
 };
