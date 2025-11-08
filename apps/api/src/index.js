@@ -21,6 +21,8 @@ import analyticsRoutes from './routes/analytics.js';
 import adminRoutes from './routes/admin.js';
 import gamificationRoutes from './routes/gamification.js';
 import ecommerceRoutes from './routes/ecommerce.js';
+import publicRoutes from './routes/public.js';
+import { startNotificationScheduler } from './services/notificationScheduler.js';
 
 const app = express();
 app.use(cors({ origin: config.corsOrigin, credentials: true }));
@@ -28,6 +30,7 @@ app.use(express.json({ limit: '5mb' }));
 app.use(morgan('dev'));
 
 app.get('/api/health', (req, res) => res.json({ ok: true, ts: Date.now() }));
+app.use('/api/public', publicRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/groups', groupRoutes);
@@ -52,5 +55,6 @@ app.use((err, req, res, next) => {
 });
 
 connectDB().then(() => {
+  startNotificationScheduler();
   app.listen(config.port, () => console.log(`🚀 API running on port ${config.port}`));
 });

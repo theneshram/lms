@@ -38,6 +38,11 @@ const SsoSchema = new mongoose.Schema({
   metadata: mongoose.Schema.Types.Mixed,
 }, { _id: false });
 
+const PasswordResetSchema = new mongoose.Schema({
+  token: String,
+  expiresAt: Date,
+}, { _id: false });
+
 const UserSchema = new mongoose.Schema({
   name: { type: String, required: true },
   email: { type: String, required: true, unique: true, index: true },
@@ -64,6 +69,7 @@ const UserSchema = new mongoose.Schema({
     completedCourses: { type: Number, default: 0 },
     badgesEarned: { type: Number, default: 0 },
   },
+  passwordReset: { type: PasswordResetSchema, default: () => ({}) },
 }, { timestamps: true });
 
 UserSchema.pre('save', async function(next) {

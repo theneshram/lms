@@ -55,6 +55,7 @@ const CourseSchema = new mongoose.Schema({
   resources: [ResourceSchema],
   contentVersion: { type: Number, default: 1 },
   metadata: mongoose.Schema.Types.Mixed,
+  welcomeMessage: { type: String, default: 'Welcome to the course!' },
 }, { timestamps: true });
 
 export default mongoose.model('Course', CourseSchema);

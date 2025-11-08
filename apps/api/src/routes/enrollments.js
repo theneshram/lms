@@ -8,6 +8,7 @@ import PaymentRecord from '../models/PaymentRecord.js';
 import Course from '../models/Course.js';
 import { asyncHandler } from '../utils/error.js';
 import { logActivity } from '../utils/activity.js';
+import { sendTemplateMail } from '../services/mailer.js';
 
 const router = Router();
 
@@ -22,6 +23,9 @@ router.post(
       { ...req.body, enrolledBy: req.user._id, status: 'ACTIVE' },
       { upsert: true, new: true }
     );
+    if (enrollment) {
+      await sendEnrollmentEmails(enrollment._id);
+    }
     await logActivity({ user: req.user._id, action: 'ENROLLMENT_CREATED', entityType: 'ENROLLMENT', entityId: enrollment._id, metadata: req.body, req });
     res.json(enrollment);
   })
@@ -53,6 +57,7 @@ router.post(
       { course: courseId, user: req.user._id, status: 'ACTIVE', enrollmentSource: 'SELF' },
       { upsert: true, new: true }
     );
+    await sendEnrollmentEmails(enrollment._id);
     res.json(enrollment);
   })
 );
@@ -125,5 +130,34 @@ router.get(
     res.json(enrollments);
   })
 );
+
+router.get(
+  '/me',
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const enrollments = await Enrollment.find({ user: req.user._id, status: 'ACTIVE' }).populate('course');
+    res.json(enrollments);
+  })
+);
+
+async function sendEnrollmentEmails(enrollmentId) {
+  const enrollment = await Enrollment.findById(enrollmentId).populate('user').populate('course');
+  if (!enrollment?.user?.email || !enrollment?.course) return;
+  await sendTemplateMail('course-enrollment', {
+    to: enrollment.user.email,
+    context: {
+      name: enrollment.user.name,
+      course: enrollment.course.title,
+    },
+  }).catch(() => {});
+  await sendTemplateMail('course-welcome-html', {
+    to: enrollment.user.email,
+    context: {
+      name: enrollment.user.name,
+      course: enrollment.course.title,
+      message: enrollment.course?.welcomeMessage || 'We are excited to learn with you!',
+    },
+  }).catch(() => {});
+}
 
 export default router;
