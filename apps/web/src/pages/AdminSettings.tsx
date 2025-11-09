@@ -634,13 +634,13 @@ export default function AdminSettings() {
                 value={directory.clientSecret || ''}
                 onChange={(e) => updateDirectory('clientSecret', e.target.value)}
                 placeholder="Client secret"
-                className="w-full rounded-xl border border-[var(--border-soft)] bg-[var(--surface)]/80 px-4 py-2 text-sm"
+                className="w-full rounded-xl border border-slate-200/60 bg-white/70 px-4 py-2 text-sm"
               />
             </div>
           </div>
         </section>
 
-        <section id="notifications" className="card p-8 space-y-6">
+        <section className="card p-8 space-y-6">
           <div className="flex items-center justify-between flex-wrap gap-4">
             <div>
               <h2 className="text-xl font-semibold text-[var(--text)]">Event notifications</h2>
@@ -654,7 +654,7 @@ export default function AdminSettings() {
                 type="number"
                 value={notifications.eventStartLeadMinutes ?? 30}
                 onChange={(e) => updateNotifications('eventStartLeadMinutes', Number(e.target.value))}
-                className="mt-2 w-full rounded-xl border border-[var(--border-soft)] bg-[var(--surface)]/80 px-4 py-2 text-sm"
+                className="mt-2 w-full rounded-xl border border-slate-200/60 bg-white/70 px-4 py-2 text-sm"
               />
             </label>
             <label className="block text-sm text-[var(--text)]">
@@ -663,13 +663,13 @@ export default function AdminSettings() {
                 type="number"
                 value={notifications.eventEndLeadMinutes ?? 15}
                 onChange={(e) => updateNotifications('eventEndLeadMinutes', Number(e.target.value))}
-                className="mt-2 w-full rounded-xl border border-[var(--border-soft)] bg-[var(--surface)]/80 px-4 py-2 text-sm"
+                className="mt-2 w-full rounded-xl border border-slate-200/60 bg-white/70 px-4 py-2 text-sm"
               />
             </label>
           </div>
         </section>
 
-        <section id="database" className="card p-8 space-y-6">
+        <section className="card p-8 space-y-6">
           <div className="flex items-center justify-between flex-wrap gap-4">
             <div>
               <h2 className="text-xl font-semibold text-[var(--text)]">Database configuration</h2>
@@ -691,7 +691,7 @@ export default function AdminSettings() {
             <select
               value={database.provider || 'LOCAL'}
               onChange={(e) => updateDatabase('provider', e.target.value)}
-              className="rounded-xl border border-[var(--border-soft)] bg-[var(--surface)]/80 px-4 py-2 text-sm"
+              className="rounded-xl border border-slate-200/60 bg-white/70 px-4 py-2 text-sm"
             >
               <option value="LOCAL">Local MongoDB</option>
               <option value="ATLAS">MongoDB Atlas</option>
@@ -702,14 +702,14 @@ export default function AdminSettings() {
               value={database.uri || ''}
               onChange={(e) => updateDatabase('uri', e.target.value)}
               placeholder="mongodb+srv://user:pass@cluster.mongodb.net"
-              className="rounded-xl border border-[var(--border-soft)] bg-[var(--surface)]/80 px-4 py-2 text-sm"
+              className="rounded-xl border border-slate-200/60 bg-white/70 px-4 py-2 text-sm"
             />
             <input
               type="text"
               value={database.dbName || ''}
               onChange={(e) => updateDatabase('dbName', e.target.value)}
               placeholder="Database name"
-              className="rounded-xl border border-[var(--border-soft)] bg-[var(--surface)]/80 px-4 py-2 text-sm"
+              className="rounded-xl border border-slate-200/60 bg-white/70 px-4 py-2 text-sm"
             />
           </div>
 
@@ -722,7 +722,6 @@ export default function AdminSettings() {
           </button>
         </section>
       </div>
-    </div>
     </Layout>
   );
 }

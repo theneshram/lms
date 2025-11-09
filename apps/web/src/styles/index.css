@@ -10,10 +10,6 @@
   --surface: #ffffff;
   --muted: #e2e8f0;
   --border: #cbd5f5;
-  --border-soft: rgba(148, 163, 184, 0.25);
-  --header-bg: rgba(255, 255, 255, 0.85);
-  --footer-bg: rgba(255, 255, 255, 0.82);
-  --nav-bg: rgba(255, 255, 255, 0.6);
   --text: #0f172a;
   --textMuted: #475569;
   --font-heading: 'Inter', sans-serif;
@@ -23,13 +19,8 @@
 [data-theme='dark'] {
   --background: #0f172a;
   --surface: #1e293b;
-  --muted: #1f2937;
   --text: #f8fafc;
   --textMuted: #cbd5f5;
-  --header-bg: rgba(15, 23, 42, 0.85);
-  --footer-bg: rgba(15, 23, 42, 0.82);
-  --nav-bg: rgba(30, 41, 59, 0.7);
-  --border-soft: rgba(100, 116, 139, 0.35);
 }
 
 body {
@@ -51,5 +42,5 @@ h1, h2, h3, h4, h5, h6 {
   background-color: var(--surface);
   border-radius: 1rem;
   box-shadow: 0 10px 30px rgba(15, 23, 42, 0.06);
-  border: 1px solid var(--border-soft);
+  border: 1px solid rgba(148, 163, 184, 0.2);
 }
