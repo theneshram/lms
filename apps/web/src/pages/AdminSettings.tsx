@@ -60,6 +60,7 @@ export default function AdminSettings() {
   const [emailState, setEmailState] = useState<SaveState>(null);
   const [dbState, setDbState] = useState<SaveState>(null);
   const { refresh } = useTheme();
+
   const navSections = useMemo(
     () => [
       { id: 'branding', label: 'Branding & appearance' },
@@ -255,6 +256,12 @@ export default function AdminSettings() {
     );
   }
 
+  const handleNavClick = (e: React.MouseEvent<HTMLAnchorElement>, id: string) => {
+    e.preventDefault();
+    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    setActiveNav(id);
+  };
+
   return (
     <Layout>
       <div className="flex flex-col gap-10 lg:grid lg:grid-cols-[260px,1fr]">
@@ -267,7 +274,7 @@ export default function AdminSettings() {
                   <li key={section.id}>
                     <a
                       href={`#${section.id}`}
-                      onClick={() => setActiveNav(section.id)}
+                      onClick={(e) => handleNavClick(e, section.id)}
                       className={`block rounded-xl px-3 py-2 transition hover:text-[var(--text)] ${
                         activeNav === section.id
                           ? 'bg-[var(--surface)] text-[var(--text)] shadow-sm'
@@ -286,7 +293,7 @@ export default function AdminSettings() {
               <a
                 key={section.id}
                 href={`#${section.id}`}
-                onClick={() => setActiveNav(section.id)}
+                onClick={(e) => handleNavClick(e, section.id)}
                 className={`whitespace-nowrap rounded-full border px-4 py-2 ${
                   activeNav === section.id
                     ? 'border-[var(--primary)] text-[var(--text)] bg-[var(--surface)]'
@@ -309,420 +316,422 @@ export default function AdminSettings() {
           </header>
 
           <section id="branding" className="card p-8 space-y-6">
-          <div className="flex items-center justify-between flex-wrap gap-4">
-            <div>
-              <h2 className="text-xl font-semibold text-[var(--text)]">Branding & appearance</h2>
-              <p className="text-sm text-[var(--textMuted)]">Control hero branding, footer language, theme palettes, and Google font selections.</p>
+            <div className="flex items-center justify-between flex-wrap gap-4">
+              <div>
+                <h2 className="text-xl font-semibold text-[var(--text)]">Branding & appearance</h2>
+                <p className="text-sm text-[var(--textMuted)]">Control hero branding, footer language, theme palettes, and Google font selections.</p>
+              </div>
+              <button
+                onClick={handleSave}
+                disabled={saving}
+                className="px-5 py-2 rounded-full bg-[var(--primary)] text-white text-sm font-semibold shadow-lg shadow-[var(--primary)]/30 disabled:opacity-60"
+              >
+                {saving ? 'Saving…' : 'Save appearance'}
+              </button>
             </div>
-            <button
-              onClick={handleSave}
-              disabled={saving}
-              className="px-5 py-2 rounded-full bg-[var(--primary)] text-white text-sm font-semibold shadow-lg shadow-[var(--primary)]/30 disabled:opacity-60"
-            >
-              {saving ? 'Saving…' : 'Save appearance'}
-            </button>
-          </div>
 
-          {saveState && (
-            <div
-              className={`rounded-lg px-4 py-3 text-sm ${
-                saveState.tone === 'success' ? 'bg-emerald-500/10 text-emerald-600' : 'bg-rose-500/10 text-rose-600'
-              }`}
-            >
-              {saveState.message}
-            </div>
-          )}
+            {saveState && (
+              <div
+                className={`rounded-lg px-4 py-3 text-sm ${
+                  saveState.tone === 'success' ? 'bg-emerald-500/10 text-emerald-600' : 'bg-rose-500/10 text-rose-600'
+                }`}
+              >
+                {saveState.message}
+              </div>
+            )}
 
-          <div className="grid md:grid-cols-2 gap-6">
-            <div className="space-y-4">
-              <label className="block text-sm font-semibold text-[var(--text)]">Header title</label>
-              <input
-                type="text"
-                value={appearance.header?.title || ''}
-                onChange={(e) => updateHeader('title', e.target.value)}
-                className="w-full rounded-xl border border-[var(--border-soft)] bg-[var(--surface)]/80 px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/40"
-              />
-              <label className="block text-sm font-semibold text-[var(--text)]">Application name</label>
-              <input
-                type="text"
-                value={appearance.header?.applicationName || ''}
-                onChange={(e) => updateHeader('applicationName', e.target.value)}
-                className="w-full rounded-xl border border-[var(--border-soft)] bg-[var(--surface)]/80 px-4 py-2 text-sm"
-              />
-              <label className="block text-sm font-semibold text-[var(--text)]">Logo URL</label>
-              <input
-                type="url"
-                value={appearance.header?.logoUrl || ''}
-                onChange={(e) => updateHeader('logoUrl', e.target.value)}
-                placeholder="https://cdn.example.com/logo.svg"
-                className="w-full rounded-xl border border-[var(--border-soft)] bg-[var(--surface)]/80 px-4 py-2 text-sm"
-              />
-            </div>
-            <div className="space-y-4">
-              <label className="block text-sm font-semibold text-[var(--text)]">Footer organization</label>
-              <input
-                type="text"
-                value={appearance.footer?.organization || ''}
-                onChange={(e) => updateFooter('organization', e.target.value)}
-                className="w-full rounded-xl border border-[var(--border-soft)] bg-[var(--surface)]/80 px-4 py-2 text-sm"
-              />
-              <label className="block text-sm font-semibold text-[var(--text)]">Footer legal text</label>
-              <input
-                type="text"
-                value={appearance.footer?.legal || ''}
-                onChange={(e) => updateFooter('legal', e.target.value)}
-                className="w-full rounded-xl border border-[var(--border-soft)] bg-[var(--surface)]/80 px-4 py-2 text-sm"
-              />
-              <label className="block text-sm font-semibold text-[var(--text)]">Footer custom message</label>
-              <textarea
-                value={appearance.footer?.customText || ''}
-                onChange={(e) => updateFooter('customText', e.target.value)}
-                className="w-full rounded-xl border border-[var(--border-soft)] bg-[var(--surface)]/80 px-4 py-2 text-sm"
-                rows={3}
-              />
-              <label className="inline-flex items-center gap-2 text-sm text-[var(--text)]">
+            <div className="grid md:grid-cols-2 gap-6">
+              <div className="space-y-4">
+                <label className="block text-sm font-semibold text-[var(--text)]">Header title</label>
                 <input
-                  type="checkbox"
-                  checked={appearance.footer?.showYear !== false}
-                  onChange={(e) => updateFooter('showYear', e.target.checked)}
+                  type="text"
+                  value={appearance.header?.title || ''}
+                  onChange={(e) => updateHeader('title', e.target.value)}
+                  className="w-full rounded-xl border border-[var(--border-soft)] bg-[var(--surface)]/80 px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/40"
                 />
-                Show current year in footer
-              </label>
-            </div>
-          </div>
-
-          <div className="grid md:grid-cols-3 gap-6">
-            <div>
-              <label className="block text-sm font-semibold text-[var(--text)] mb-2">Theme mode</label>
-              <select
-                value={appearance.themeMode}
-                onChange={(e) => updateAppearance({ themeMode: e.target.value as AppearanceForm['themeMode'] })}
-                className="w-full rounded-xl border border-[var(--border-soft)] bg-[var(--surface)]/80 px-4 py-2 text-sm"
-              >
-                <option value="SYSTEM">Follow system preference</option>
-                <option value="LIGHT">Always light</option>
-                <option value="DARK">Always dark</option>
-              </select>
-              <label className="mt-3 inline-flex items-center gap-2 text-sm text-[var(--text)]">
+                <label className="block text-sm font-semibold text-[var(--text)]">Application name</label>
                 <input
-                  type="checkbox"
-                  checked={appearance.allowUserToggle !== false}
-                  onChange={(e) => updateAppearance({ allowUserToggle: e.target.checked })}
+                  type="text"
+                  value={appearance.header?.applicationName || ''}
+                  onChange={(e) => updateHeader('applicationName', e.target.value)}
+                  className="w-full rounded-xl border border-[var(--border-soft)] bg-[var(--surface)]/80 px-4 py-2 text-sm"
                 />
-                Allow learners to toggle theme
-              </label>
+                <label className="block text-sm font-semibold text-[var(--text)]">Logo URL</label>
+                <input
+                  type="url"
+                  value={appearance.header?.logoUrl || ''}
+                  onChange={(e) => updateHeader('logoUrl', e.target.value)}
+                  placeholder="https://cdn.example.com/logo.svg"
+                  className="w-full rounded-xl border border-[var(--border-soft)] bg-[var(--surface)]/80 px-4 py-2 text-sm"
+                />
+              </div>
+              <div className="space-y-4">
+                <label className="block text-sm font-semibold text-[var(--text)]">Footer organization</label>
+                <input
+                  type="text"
+                  value={appearance.footer?.organization || ''}
+                  onChange={(e) => updateFooter('organization', e.target.value)}
+                  className="w-full rounded-xl border border-[var(--border-soft)] bg-[var(--surface)]/80 px-4 py-2 text-sm"
+                />
+                <label className="block text-sm font-semibold text-[var(--text)]">Footer legal text</label>
+                <input
+                  type="text"
+                  value={appearance.footer?.legal || ''}
+                  onChange={(e) => updateFooter('legal', e.target.value)}
+                  className="w-full rounded-xl border border-[var(--border-soft)] bg-[var(--surface)]/80 px-4 py-2 text-sm"
+                />
+                <label className="block text-sm font-semibold text-[var(--text)]">Footer custom message</label>
+                <textarea
+                  value={appearance.footer?.customText || ''}
+                  onChange={(e) => updateFooter('customText', e.target.value)}
+                  className="w-full rounded-xl border border-[var(--border-soft)] bg-[var(--surface)]/80 px-4 py-2 text-sm"
+                  rows={3}
+                />
+                <label className="inline-flex items-center gap-2 text-sm text-[var(--text)]">
+                  <input
+                    type="checkbox"
+                    checked={appearance.footer?.showYear !== false}
+                    onChange={(e) => updateFooter('showYear', e.target.checked)}
+                  />
+                  Show current year in footer
+                </label>
+              </div>
             </div>
-            <div>
-              <label className="block text-sm font-semibold text-[var(--text)] mb-2">Heading font</label>
-              <select
-                value={appearance.typography?.heading || ''}
-                onChange={(e) => updateTypography('heading', e.target.value)}
-                className="w-full rounded-xl border border-[var(--border-soft)] bg-[var(--surface)]/80 px-4 py-2 text-sm"
-              >
-                <option value="">Default (Inter)</option>
-                {fonts.map((font) => (
-                  <option key={font} value={font}>
-                    {font}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-[var(--text)] mb-2">Body font</label>
-              <select
-                value={appearance.typography?.body || ''}
-                onChange={(e) => updateTypography('body', e.target.value)}
-                className="w-full rounded-xl border border-[var(--border-soft)] bg-[var(--surface)]/80 px-4 py-2 text-sm"
-              >
-                <option value="">Default (Inter)</option>
-                {fonts.map((font) => (
-                  <option key={font} value={font}>
-                    {font}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
 
-          <div>
-            <p className="text-sm font-semibold text-[var(--text)] mb-3">Theme palettes</p>
-            <div className="grid md:grid-cols-3 gap-4">
-              {appearance.palettes?.map((palette: Palette) => (
-                <button
-                  type="button"
-                  key={palette.id}
-                  onClick={() => updateAppearance({ activePaletteId: palette.id })}
-                  className={`rounded-2xl border-2 p-4 text-left space-y-3 transition ${
-                    palette.id === appearance.activePaletteId
-                      ? 'border-[var(--primary)] shadow-lg shadow-[var(--primary)]/20'
-                      : 'border-transparent bg-white/60 hover:border-[var(--primary)]/40'
-                  }`}
+            <div className="grid md:grid-cols-3 gap-6">
+              <div>
+                <label className="block text-sm font-semibold text-[var(--text)] mb-2">Theme mode</label>
+                <select
+                  value={appearance.themeMode}
+                  onChange={(e) => updateAppearance({ themeMode: e.target.value as AppearanceForm['themeMode'] })}
+                  className="w-full rounded-xl border border-[var(--border-soft)] bg-[var(--surface)]/80 px-4 py-2 text-sm"
                 >
-                  <div className="flex gap-2">
-                    {Object.entries(palette.colors)
-                      .slice(0, 4)
-                      .map(([key, value]) => (
-                        <span key={key} className="h-8 w-8 rounded-full border border-white/60" style={{ background: value }} />
-                      ))}
-                  </div>
-                  <div>
-                    <p className="font-semibold text-[var(--text)]">{palette.name}</p>
-                    <p className="text-xs text-[var(--textMuted)]">{palette.description}</p>
-                  </div>
-                </button>
-              ))}
+                  <option value="SYSTEM">Follow system preference</option>
+                  <option value="LIGHT">Always light</option>
+                  <option value="DARK">Always dark</option>
+                </select>
+                <label className="mt-3 inline-flex items-center gap-2 text-sm text-[var(--text)]">
+                  <input
+                    type="checkbox"
+                    checked={appearance.allowUserToggle !== false}
+                    onChange={(e) => updateAppearance({ allowUserToggle: e.target.checked })}
+                  />
+                  Allow learners to toggle theme
+                </label>
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-[var(--text)] mb-2">Heading font</label>
+                <select
+                  value={appearance.typography?.heading || ''}
+                  onChange={(e) => updateTypography('heading', e.target.value)}
+                  className="w-full rounded-xl border border-[var(--border-soft)] bg-[var(--surface)]/80 px-4 py-2 text-sm"
+                >
+                  <option value="">Default (Inter)</option>
+                  {fonts.map((font) => (
+                    <option key={font} value={font}>
+                      {font}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-[var(--text)] mb-2">Body font</label>
+                <select
+                  value={appearance.typography?.body || ''}
+                  onChange={(e) => updateTypography('body', e.target.value)}
+                  className="w-full rounded-xl border border-[var(--border-soft)] bg-[var(--surface)]/80 px-4 py-2 text-sm"
+                >
+                  <option value="">Default (Inter)</option>
+                  {fonts.map((font) => (
+                    <option key={font} value={font}>
+                      {font}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
-          </div>
-        </section>
 
-        <section id="smtp" className="card p-8 space-y-6">
-          <div className="flex items-center justify-between flex-wrap gap-4">
             <div>
-              <h2 className="text-xl font-semibold text-[var(--text)]">SMTP email setup</h2>
-              <p className="text-sm text-[var(--textMuted)]">Configure transactional email for password resets, welcome letters, and enrollment confirmations.</p>
+              <p className="text-sm font-semibold text-[var(--text)] mb-3">Theme palettes</p>
+              <div className="grid md:grid-cols-3 gap-4">
+                {appearance.palettes?.map((palette: Palette) => (
+                  <button
+                    type="button"
+                    key={palette.id}
+                    onClick={() => updateAppearance({ activePaletteId: palette.id })}
+                    className={`rounded-2xl border-2 p-4 text-left space-y-3 transition ${
+                      palette.id === appearance.activePaletteId
+                        ? 'border-[var(--primary)] shadow-lg shadow-[var(--primary)]/20'
+                        : 'border-transparent bg-white/60 hover:border-[var(--primary)]/40'
+                    }`}
+                  >
+                    <div className="flex gap-2">
+                      {Object.entries(palette.colors)
+                        .slice(0, 4)
+                        .map(([key, value]) => (
+                          <span key={key} className="h-8 w-8 rounded-full border border-white/60" style={{ background: value }} />
+                        ))}
+                    </div>
+                    <div>
+                      <p className="font-semibold text-[var(--text)]">{palette.name}</p>
+                      <p className="text-xs text-[var(--textMuted)]">{palette.description}</p>
+                    </div>
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
+          </section>
 
-          {emailState && (
-            <div
-              className={`rounded-lg px-4 py-3 text-sm ${
-                emailState.tone === 'success' ? 'bg-emerald-500/10 text-emerald-600' : 'bg-rose-500/10 text-rose-600'
-              }`}
-            >
-              {emailState.message}
+          <section id="smtp" className="card p-8 space-y-6">
+            <div className="flex items-center justify-between flex-wrap gap-4">
+              <div>
+                <h2 className="text-xl font-semibold text-[var(--text)]">SMTP email setup</h2>
+                <p className="text-sm text-[var(--textMuted)]">Configure transactional email for password resets, welcome letters, and enrollment confirmations.</p>
+              </div>
             </div>
-          )}
 
-          <div className="grid md:grid-cols-3 gap-4">
-            <input
-              type="text"
-              value={smtp?.host || ''}
-              onChange={(e) => updateSmtp('host', e.target.value)}
-              placeholder="SMTP host"
-              className="rounded-xl border border-[var(--border-soft)] bg-[var(--surface)]/80 px-4 py-2 text-sm"
-            />
-            <input
-              type="number"
-              value={smtp?.port ?? 587}
-              onChange={(e) => updateSmtp('port', Number(e.target.value))}
-              placeholder="Port"
-              className="rounded-xl border border-[var(--border-soft)] bg-[var(--surface)]/80 px-4 py-2 text-sm"
-            />
-            <label className="inline-flex items-center gap-2 text-sm text-[var(--text)]">
-              <input
-                type="checkbox"
-                checked={Boolean(smtp?.secure)}
-                onChange={(e) => updateSmtp('secure', e.target.checked)}
-              />
-              Use SSL/TLS
-            </label>
-            <input
-              type="text"
-              value={smtp?.user || ''}
-              onChange={(e) => updateSmtp('user', e.target.value)}
-              placeholder="Username"
-              className="rounded-xl border border-[var(--border-soft)] bg-[var(--surface)]/80 px-4 py-2 text-sm"
-            />
-            <input
-              type="password"
-              value={smtp?.password || ''}
-              onChange={(e) => updateSmtp('password', e.target.value)}
-              placeholder="Password / App token"
-              className="rounded-xl border border-[var(--border-soft)] bg-[var(--surface)]/80 px-4 py-2 text-sm"
-            />
-            <input
-              type="text"
-              value={smtp?.fromName || ''}
-              onChange={(e) => updateSmtp('fromName', e.target.value)}
-              placeholder="From name"
-              className="rounded-xl border border-[var(--border-soft)] bg-[var(--surface)]/80 px-4 py-2 text-sm"
-            />
-            <input
-              type="email"
-              value={smtp?.fromEmail || ''}
-              onChange={(e) => updateSmtp('fromEmail', e.target.value)}
-              placeholder="From email"
-              className="rounded-xl border border-[var(--border-soft)] bg-[var(--surface)]/80 px-4 py-2 text-sm"
-            />
-          </div>
-
-          <div className="flex flex-wrap items-center gap-3">
-            <input
-              type="email"
-              value={emailTest}
-              onChange={(e) => setEmailTest(e.target.value)}
-              placeholder="Send test email to"
-              className="rounded-full border border-[var(--border-soft)] bg-[var(--surface)]/80 px-4 py-2 text-sm"
-            />
-            <button
-              type="button"
-              onClick={handleTestEmail}
-              className="px-4 py-2 rounded-full bg-[var(--primary)] text-white text-sm font-semibold shadow-lg shadow-[var(--primary)]/30"
-            >
-              Send test email
-            </button>
-          </div>
-        </section>
-
-        <section id="directory" className="card p-8 space-y-6">
-          <div className="flex items-center justify-between flex-wrap gap-4">
-            <div>
-              <h2 className="text-xl font-semibold text-[var(--text)]">Directory & SSO</h2>
-              <p className="text-sm text-[var(--textMuted)]">Enable Azure AD, Google, Okta, or generic SAML to auto-provision accounts with the appropriate LMS roles.</p>
-            </div>
-          </div>
-
-          <div className="grid md:grid-cols-2 gap-4">
-            <div className="space-y-4">
-              <label className="block text-sm font-semibold text-[var(--text)]">Provider</label>
-              <select
-                value={directory.provider || 'NONE'}
-                onChange={(e) => updateDirectory('provider', e.target.value)}
-                className="w-full rounded-xl border border-[var(--border-soft)] bg-[var(--surface)]/80 px-4 py-2 text-sm"
+            {emailState && (
+              <div
+                className={`rounded-lg px-4 py-3 text-sm ${
+                  emailState.tone === 'success' ? 'bg-emerald-500/10 text-emerald-600' : 'bg-rose-500/10 text-rose-600'
+                }`}
               >
-                <option value="NONE">Disabled</option>
-                <option value="AZURE_AD">Azure Active Directory</option>
-                <option value="GOOGLE">Google Workspace / Cloud Identity</option>
-                <option value="OKTA">Okta</option>
-                <option value="GENERIC_SAML">Generic SAML 2.0</option>
-              </select>
+                {emailState.message}
+              </div>
+            )}
+
+            <div className="grid md:grid-cols-3 gap-4">
+              <input
+                type="text"
+                value={smtp?.host || ''}
+                onChange={(e) => updateSmtp('host', e.target.value)}
+                placeholder="SMTP host"
+                className="rounded-xl border border-[var(--border-soft)] bg-[var(--surface)]/80 px-4 py-2 text-sm"
+              />
+              <input
+                type="number"
+                value={smtp?.port ?? 587}
+                onChange={(e) => updateSmtp('port', Number(e.target.value))}
+                placeholder="Port"
+                className="rounded-xl border border-[var(--border-soft)] bg-[var(--surface)]/80 px-4 py-2 text-sm"
+              />
               <label className="inline-flex items-center gap-2 text-sm text-[var(--text)]">
                 <input
                   type="checkbox"
-                  checked={Boolean(directory.enabled)}
-                  onChange={(e) => updateDirectory('enabled', e.target.checked)}
+                  checked={Boolean(smtp?.secure)}
+                  onChange={(e) => updateSmtp('secure', e.target.checked)}
                 />
-                Enable SSO for sign-in
+                Use SSL/TLS
               </label>
-              <label className="block text-sm font-semibold text-[var(--text)]">Default LMS role</label>
-              <select
-                value={directory.defaultRole || 'STUDENT'}
-                onChange={(e) => updateDirectory('defaultRole', e.target.value)}
-                className="w-full rounded-xl border border-[var(--border-soft)] bg-[var(--surface)]/80 px-4 py-2 text-sm"
-              >
-                {roleOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="space-y-4">
               <input
                 type="text"
-                value={directory.domain || ''}
-                onChange={(e) => updateDirectory('domain', e.target.value)}
-                placeholder="Tenant domain"
-                className="w-full rounded-xl border border-[var(--border-soft)] bg-[var(--surface)]/80 px-4 py-2 text-sm"
-              />
-              <input
-                type="url"
-                value={directory.metadataUrl || ''}
-                onChange={(e) => updateDirectory('metadataUrl', e.target.value)}
-                placeholder="Metadata URL"
-                className="w-full rounded-xl border border-[var(--border-soft)] bg-[var(--surface)]/80 px-4 py-2 text-sm"
-              />
-              <input
-                type="text"
-                value={directory.clientId || ''}
-                onChange={(e) => updateDirectory('clientId', e.target.value)}
-                placeholder="Client ID"
-                className="w-full rounded-xl border border-[var(--border-soft)] bg-[var(--surface)]/80 px-4 py-2 text-sm"
+                value={smtp?.user || ''}
+                onChange={(e) => updateSmtp('user', e.target.value)}
+                placeholder="Username"
+                className="rounded-xl border border-[var(--border-soft)] bg-[var(--surface)]/80 px-4 py-2 text-sm"
               />
               <input
                 type="password"
-                value={directory.clientSecret || ''}
-                onChange={(e) => updateDirectory('clientSecret', e.target.value)}
-                placeholder="Client secret"
-                className="w-full rounded-xl border border-slate-200/60 bg-white/70 px-4 py-2 text-sm"
+                value={smtp?.password || ''}
+                onChange={(e) => updateSmtp('password', e.target.value)}
+                placeholder="Password / App token"
+                className="rounded-xl border border-[var(--border-soft)] bg-[var(--surface)]/80 px-4 py-2 text-sm"
               />
-            </div>
-          </div>
-        </section>
-
-        <section className="card p-8 space-y-6">
-          <div className="flex items-center justify-between flex-wrap gap-4">
-            <div>
-              <h2 className="text-xl font-semibold text-[var(--text)]">Event notifications</h2>
-              <p className="text-sm text-[var(--textMuted)]">Define default reminder offsets for live sessions and closing summaries. Instructors can opt in or out when scheduling.</p>
-            </div>
-          </div>
-          <div className="grid md:grid-cols-2 gap-4">
-            <label className="block text-sm text-[var(--text)]">
-              Reminder before start (minutes)
               <input
-                type="number"
-                value={notifications.eventStartLeadMinutes ?? 30}
-                onChange={(e) => updateNotifications('eventStartLeadMinutes', Number(e.target.value))}
-                className="mt-2 w-full rounded-xl border border-slate-200/60 bg-white/70 px-4 py-2 text-sm"
+                type="text"
+                value={smtp?.fromName || ''}
+                onChange={(e) => updateSmtp('fromName', e.target.value)}
+                placeholder="From name"
+                className="rounded-xl border border-[var(--border-soft)] bg-[var(--surface)]/80 px-4 py-2 text-sm"
               />
-            </label>
-            <label className="block text-sm text-[var(--text)]">
-              Follow-up after end (minutes)
               <input
-                type="number"
-                value={notifications.eventEndLeadMinutes ?? 15}
-                onChange={(e) => updateNotifications('eventEndLeadMinutes', Number(e.target.value))}
-                className="mt-2 w-full rounded-xl border border-slate-200/60 bg-white/70 px-4 py-2 text-sm"
+                type="email"
+                value={smtp?.fromEmail || ''}
+                onChange={(e) => updateSmtp('fromEmail', e.target.value)}
+                placeholder="From email"
+                className="rounded-xl border border-[var(--border-soft)] bg-[var(--surface)]/80 px-4 py-2 text-sm"
               />
-            </label>
-          </div>
-        </section>
-
-        <section className="card p-8 space-y-6">
-          <div className="flex items-center justify-between flex-wrap gap-4">
-            <div>
-              <h2 className="text-xl font-semibold text-[var(--text)]">Database configuration</h2>
-              <p className="text-sm text-[var(--textMuted)]">Switch between local MongoDB deployments and managed MongoDB Atlas clusters, then migrate schemas instantly.</p>
             </div>
-          </div>
 
-          {dbState && (
-            <div
-              className={`rounded-lg px-4 py-3 text-sm ${
-                dbState.tone === 'success' ? 'bg-emerald-500/10 text-emerald-600' : 'bg-rose-500/10 text-rose-600'
-              }`}
-            >
-              {dbState.message}
+            <div className="flex flex-wrap items-center gap-3">
+              <input
+                type="email"
+                value={emailTest}
+                onChange={(e) => setEmailTest(e.target.value)}
+                placeholder="Send test email to"
+                className="rounded-full border border-[var(--border-soft)] bg-[var(--surface)]/80 px-4 py-2 text-sm"
+              />
+              <button
+                type="button"
+                onClick={handleTestEmail}
+                className="px-4 py-2 rounded-full bg-[var(--primary)] text-white text-sm font-semibold shadow-lg shadow-[var(--primary)]/30"
+              >
+                Send test email
+              </button>
             </div>
-          )}
+          </section>
 
-          <div className="grid md:grid-cols-3 gap-4">
-            <select
-              value={database.provider || 'LOCAL'}
-              onChange={(e) => updateDatabase('provider', e.target.value)}
-              className="rounded-xl border border-slate-200/60 bg-white/70 px-4 py-2 text-sm"
+          <section id="directory" className="card p-8 space-y-6">
+            <div className="flex items-center justify-between flex-wrap gap-4">
+              <div>
+                <h2 className="text-xl font-semibold text-[var(--text)]">Directory & SSO</h2>
+                <p className="text-sm text-[var(--textMuted)]">Enable Azure AD, Google, Okta, or generic SAML to auto-provision accounts with the appropriate LMS roles.</p>
+              </div>
+            </div>
+
+            <div className="grid md:grid-cols-2 gap-4">
+              <div className="space-y-4">
+                <label className="block text-sm font-semibold text-[var(--text)]">Provider</label>
+                <select
+                  value={directory.provider || 'NONE'}
+                  onChange={(e) => updateDirectory('provider', e.target.value)}
+                  className="w-full rounded-xl border border-[var(--border-soft)] bg-[var(--surface)]/80 px-4 py-2 text-sm"
+                >
+                  <option value="NONE">Disabled</option>
+                  <option value="AZURE_AD">Azure Active Directory</option>
+                  <option value="GOOGLE">Google Workspace / Cloud Identity</option>
+                  <option value="OKTA">Okta</option>
+                  <option value="GENERIC_SAML">Generic SAML 2.0</option>
+                </select>
+                <label className="inline-flex items-center gap-2 text-sm text-[var(--text)]">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(directory.enabled)}
+                    onChange={(e) => updateDirectory('enabled', e.target.checked)}
+                  />
+                  Enable SSO for sign-in
+                </label>
+                <label className="block text-sm font-semibold text-[var(--text)]">Default LMS role</label>
+                <select
+                  value={directory.defaultRole || 'STUDENT'}
+                  onChange={(e) => updateDirectory('defaultRole', e.target.value)}
+                  className="w-full rounded-xl border border-[var(--border-soft)] bg-[var(--surface)]/80 px-4 py-2 text-sm"
+                >
+                  {roleOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-4">
+                <input
+                  type="text"
+                  value={directory.domain || ''}
+                  onChange={(e) => updateDirectory('domain', e.target.value)}
+                  placeholder="Tenant domain"
+                  className="w-full rounded-xl border border-[var(--border-soft)] bg-[var(--surface)]/80 px-4 py-2 text-sm"
+                />
+                <input
+                  type="url"
+                  value={directory.metadataUrl || ''}
+                  onChange={(e) => updateDirectory('metadataUrl', e.target.value)}
+                  placeholder="Metadata URL"
+                  className="w-full rounded-xl border border-[var(--border-soft)] bg-[var(--surface)]/80 px-4 py-2 text-sm"
+                />
+                <input
+                  type="text"
+                  value={directory.clientId || ''}
+                  onChange={(e) => updateDirectory('clientId', e.target.value)}
+                  placeholder="Client ID"
+                  className="w-full rounded-xl border border-[var(--border-soft)] bg-[var(--surface)]/80 px-4 py-2 text-sm"
+                />
+                <input
+                  type="password"
+                  value={directory.clientSecret || ''}
+                  onChange={(e) => updateDirectory('clientSecret', e.target.value)}
+                  placeholder="Client secret"
+                  className="w-full rounded-xl border border-slate-200/60 bg-white/70 px-4 py-2 text-sm"
+                />
+              </div>
+            </div>
+          </section>
+
+          {/* Notifications section with ID */}
+          <section id="notifications" className="card p-8 space-y-6">
+            <div className="flex items-center justify-between flex-wrap gap-4">
+              <div>
+                <h2 className="text-xl font-semibold text-[var(--text)]">Event notifications</h2>
+                <p className="text-sm text-[var(--textMuted)]">Define default reminder offsets for live sessions and closing summaries. Instructors can opt in or out when scheduling.</p>
+              </div>
+            </div>
+            <div className="grid md:grid-cols-2 gap-4">
+              <label className="block text-sm text-[var(--text)]">
+                Reminder before start (minutes)
+                <input
+                  type="number"
+                  value={notifications.eventStartLeadMinutes ?? 30}
+                  onChange={(e) => updateNotifications('eventStartLeadMinutes', Number(e.target.value))}
+                  className="mt-2 w-full rounded-xl border border-slate-200/60 bg-white/70 px-4 py-2 text-sm"
+                />
+              </label>
+              <label className="block text-sm text-[var(--text)]">
+                Follow-up after end (minutes)
+                <input
+                  type="number"
+                  value={notifications.eventEndLeadMinutes ?? 15}
+                  onChange={(e) => updateNotifications('eventEndLeadMinutes', Number(e.target.value))}
+                  className="mt-2 w-full rounded-xl border border-slate-200/60 bg-white/70 px-4 py-2 text-sm"
+                />
+              </label>
+            </div>
+          </section>
+
+          {/* Database section with ID */}
+          <section id="database" className="card p-8 space-y-6">
+            <div className="flex items-center justify-between flex-wrap gap-4">
+              <div>
+                <h2 className="text-xl font-semibold text-[var(--text)]">Database configuration</h2>
+                <p className="text-sm text-[var(--textMuted)]">Switch between local MongoDB deployments and managed MongoDB Atlas clusters, then migrate schemas instantly.</p>
+              </div>
+            </div>
+
+            {dbState && (
+              <div
+                className={`rounded-lg px-4 py-3 text-sm ${
+                  dbState.tone === 'success' ? 'bg-emerald-500/10 text-emerald-600' : 'bg-rose-500/10 text-rose-600'
+                }`}
+              >
+                {dbState.message}
+              </div>
+            )}
+
+            <div className="grid md:grid-cols-3 gap-4">
+              <select
+                value={database.provider || 'LOCAL'}
+                onChange={(e) => updateDatabase('provider', e.target.value)}
+                className="rounded-xl border border-slate-200/60 bg-white/70 px-4 py-2 text-sm"
+              >
+                <option value="LOCAL">Local MongoDB</option>
+                <option value="ATLAS">MongoDB Atlas</option>
+                <option value="CUSTOM">Custom connection</option>
+              </select>
+              <input
+                type="text"
+                value={database.uri || ''}
+                onChange={(e) => updateDatabase('uri', e.target.value)}
+                placeholder="mongodb+srv://user:pass@cluster.mongodb.net"
+                className="rounded-xl border border-slate-200/60 bg-white/70 px-4 py-2 text-sm"
+              />
+              <input
+                type="text"
+                value={database.dbName || ''}
+                onChange={(e) => updateDatabase('dbName', e.target.value)}
+                placeholder="Database name"
+                className="rounded-xl border border-slate-200/60 bg-white/70 px-4 py-2 text-sm"
+              />
+            </div>
+
+            <button
+              type="button"
+              onClick={handleApplyDatabase}
+              className="px-5 py-2 rounded-full bg-[var(--primary)] text-white text-sm font-semibold shadow-lg shadow-[var(--primary)]/30"
             >
-              <option value="LOCAL">Local MongoDB</option>
-              <option value="ATLAS">MongoDB Atlas</option>
-              <option value="CUSTOM">Custom connection</option>
-            </select>
-            <input
-              type="text"
-              value={database.uri || ''}
-              onChange={(e) => updateDatabase('uri', e.target.value)}
-              placeholder="mongodb+srv://user:pass@cluster.mongodb.net"
-              className="rounded-xl border border-slate-200/60 bg-white/70 px-4 py-2 text-sm"
-            />
-            <input
-              type="text"
-              value={database.dbName || ''}
-              onChange={(e) => updateDatabase('dbName', e.target.value)}
-              placeholder="Database name"
-              className="rounded-xl border border-slate-200/60 bg-white/70 px-4 py-2 text-sm"
-            />
-          </div>
-
-          <button
-            type="button"
-            onClick={handleApplyDatabase}
-            className="px-5 py-2 rounded-full bg-[var(--primary)] text-white text-sm font-semibold shadow-lg shadow-[var(--primary)]/30"
-          >
-            Apply & run schema sync
-          </button>
-        </section>
+              Apply & run schema sync
+            </button>
+          </section>
+        </div>
       </div>
     </Layout>
   );
 }
-

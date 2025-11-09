@@ -1,3 +1,4 @@
+// Dashboard.tsx
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import Layout from '../components/Layout';
@@ -10,7 +11,7 @@ type Course = {
   description?: string;
   startDate?: string;
   endDate?: string;
-  visibility?: string;
+  visibility?: 'PUBLIC' | 'INVITE_ONLY' | 'PRIVATE';
 };
 
 type Enrollment = {
@@ -52,7 +53,11 @@ export default function Dashboard() {
     load();
   }, []);
 
-  const enrolledCourseIds = useMemo(() => new Set(enrollments.map((en) => en.course?._id || en._id)), [enrollments]);
+  const enrolledCourseIds = useMemo(
+    () => new Set(enrollments.map((en) => en.course?._id || en._id)),
+    [enrollments]
+  );
+
   const openCourses = useMemo(
     () =>
       catalog.filter((course) => {
@@ -91,24 +96,35 @@ export default function Dashboard() {
                   </p>
                 ) : (
                   <div className="grid md:grid-cols-2 gap-4">
-                    {enrollments.map((enrollment) => (
-                      <Link
-                        key={enrollment._id}
-                        to={`/courses/${enrollment.course?._id}`}
-                        className="rounded-2xl border border-slate-200/70 bg-white/70 dark:bg-slate-900/60 p-4 shadow-sm hover:shadow-lg transition"
-                      >
-                        <h3 className="font-semibold text-[var(--text)] mb-2">{enrollment.course?.title}</h3>
-                        <p
-                          className="text-xs text-[var(--textMuted)] leading-relaxed overflow-hidden"
-                          style={{ display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical' }}
+                    {enrollments.map((enrollment) => {
+                      const timeline = getCourseTimeline(enrollment.course || {});
+                      return (
+                        <Link
+                          key={enrollment._id}
+                          to={`/courses/${enrollment.course?._id}`}
+                          className="rounded-2xl border border-slate-200/70 bg-white/70 dark:bg-slate-900/60 p-4 shadow-sm hover:shadow-lg transition"
                         >
-                          {enrollment.course?.description || 'Stay engaged and track your progress with assignments and quizzes.'}
-                        </p>
-                        <span className="mt-3 inline-flex items-center text-xs font-semibold text-[var(--primary)]">
-                          Continue learning →
-                        </span>
-                      </Link>
-                    ))}
+                          <div className="flex items-start justify-between gap-3">
+                            <h3 className="font-semibold text-[var(--text)] mb-2">
+                              {enrollment.course?.title}
+                            </h3>
+                            {timeline?.label && (
+                              <span className={`text-xs font-semibold ${timeline.tone}`}>{timeline.label}</span>
+                            )}
+                          </div>
+                          <p
+                            className="text-xs text-[var(--textMuted)] leading-relaxed overflow-hidden"
+                            style={{ display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical' }}
+                          >
+                            {enrollment.course?.description ||
+                              'Stay engaged and track your progress with assignments and quizzes.'}
+                          </p>
+                          <span className="mt-3 inline-flex items-center text-xs font-semibold text-[var(--primary)]">
+                            Continue learning →
+                          </span>
+                        </Link>
+                      );
+                    })}
                   </div>
                 )}
               </div>
@@ -116,7 +132,9 @@ export default function Dashboard() {
               <div className="card p-6 space-y-4">
                 <div className="flex items-center justify-between">
                   <h2 className="text-xl font-semibold text-[var(--text)]">Open courses to enroll</h2>
-                  <span className="text-xs uppercase tracking-[0.2em] text-[var(--textMuted)]">{openCourses.length} available</span>
+                  <span className="text-xs uppercase tracking-[0.2em] text-[var(--textMuted)]">
+                    {openCourses.length} available
+                  </span>
                 </div>
                 {openCourses.length === 0 ? (
                   <p className="text-sm text-[var(--textMuted)]">All caught up! Check back later for new offerings.</p>
@@ -149,15 +167,24 @@ export default function Dashboard() {
               <div className="card p-6 space-y-4">
                 <h2 className="text-xl font-semibold text-[var(--text)]">Upcoming events</h2>
                 {events.length === 0 ? (
-                  <p className="text-sm text-[var(--textMuted)]">No live sessions scheduled. Create or join events from your courses.</p>
+                  <p className="text-sm text-[var(--textMuted)]">
+                    No live sessions scheduled. Create or join events from your courses.
+                  </p>
                 ) : (
                   <ul className="space-y-4">
                     {events.map((event) => {
                       const start = new Date(event.startAt);
                       return (
-                        <li key={event._id} className="rounded-xl border border-slate-200/60 p-4 bg-white/70 dark:bg-slate-900/60">
+                        <li
+                          key={event._id}
+                          className="rounded-xl border border-slate-200/60 p-4 bg-white/70 dark:bg-slate-900/60"
+                        >
                           <div className="text-xs uppercase tracking-[0.25em] text-[var(--textMuted)]">
-                            {start.toLocaleDateString(undefined, { month: 'short', day: 'numeric', weekday: 'short' })}
+                            {start.toLocaleDateString(undefined, {
+                              month: 'short',
+                              day: 'numeric',
+                              weekday: 'short',
+                            })}
                           </div>
                           <p className="font-semibold text-[var(--text)]">{event.title}</p>
                           <p className="text-xs text-[var(--textMuted)]">
@@ -196,10 +223,9 @@ export default function Dashboard() {
       </div>
     </Layout>
   );
-};
+}
 
-export default Dashboard;
-
+/** Helpers (kept from your original) */
 function toISODate(value: string | Date | undefined): string | undefined {
   if (!value) return undefined;
   const date = value instanceof Date ? value : new Date(value);
@@ -207,21 +233,22 @@ function toISODate(value: string | Date | undefined): string | undefined {
   return date.toISOString().split('T')[0];
 }
 
-function getCourseTimeline(course: Course) {
+function getCourseTimeline(course: Partial<Course>) {
   const now = new Date();
   const start = course.startDate ? new Date(course.startDate) : undefined;
   const end = course.endDate ? new Date(course.endDate) : undefined;
+
   if (start && start > now) {
-    return { label: `Starts ${formatShort(start)}`, tone: 'text-[var(--primary)]' };
+    return { label: `Starts ${formatShort(start)}`, tone: 'text-[var(--primary)]' as const };
   }
   if (end && end < now) {
-    return { label: `Ended ${formatShort(end)}`, tone: 'text-[var(--textMuted)]' };
+    return { label: `Ended ${formatShort(end)}`, tone: 'text-[var(--textMuted)]' as const };
   }
   if (end && end >= now) {
     const diffDays = Math.ceil((end.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-    return { label: `${diffDays} day${diffDays === 1 ? '' : 's'} left`, tone: 'text-amber-500' };
+    return { label: `${diffDays} day${diffDays === 1 ? '' : 's'} left`, tone: 'text-amber-500' as const };
   }
-  return { label: 'Self-paced', tone: 'text-emerald-500' };
+  return { label: 'Self-paced', tone: 'text-emerald-500' as const };
 }
 
 function formatShort(date: Date) {
@@ -229,6 +256,10 @@ function formatShort(date: Date) {
 }
 
 function formatLong(date: Date) {
-  return date.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+  return date.toLocaleDateString(undefined, {
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+  });
 }
-
