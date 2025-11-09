@@ -16,7 +16,12 @@ const QuizQuestionSchema = new mongoose.Schema({
 }, { _id: false });
 
 const QuizSchema = new mongoose.Schema({
-  course: { type: mongoose.Schema.Types.ObjectId, ref: 'Course', index: true },
+  course: { type: mongoose.Schema.Types.ObjectId, ref: 'Course', index: true, required: true },
+  module: { type: mongoose.Schema.Types.ObjectId },
+  lesson: { type: mongoose.Schema.Types.ObjectId },
+  bank: { type: mongoose.Schema.Types.ObjectId, ref: 'QuestionBank' },
+  owner: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  graders: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
   title: { type: String, required: true },
   description: String,
   bank: { type: mongoose.Schema.Types.ObjectId, ref: 'QuestionBank' },
