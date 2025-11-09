@@ -70,7 +70,7 @@ export default function App() {
                 <Link
                   key={label}
                   to={to}
-                  className="flex items-center justify-between rounded-xl border border-slate-200/60 px-4 py-3 hover:border-[var(--primary)]/60 hover:bg-[var(--primary)]/5 transition"
+                  className="flex items-center justify-between rounded-xl border border-[var(--border-soft)] bg-[var(--surface)]/80 px-4 py-3 transition hover:border-[var(--primary)]/60 hover:bg-[var(--primary)]/5"
                 >
                   <span className="font-medium text-[var(--text)]">{label}</span>
                   <span className="text-[var(--primary)] text-sm">→</span>

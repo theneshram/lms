@@ -196,4 +196,39 @@ export default function Dashboard() {
       </div>
     </Layout>
   );
+};
+
+export default Dashboard;
+
+function toISODate(value: string | Date | undefined): string | undefined {
+  if (!value) return undefined;
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return undefined;
+  return date.toISOString().split('T')[0];
 }
+
+function getCourseTimeline(course: Course) {
+  const now = new Date();
+  const start = course.startDate ? new Date(course.startDate) : undefined;
+  const end = course.endDate ? new Date(course.endDate) : undefined;
+  if (start && start > now) {
+    return { label: `Starts ${formatShort(start)}`, tone: 'text-[var(--primary)]' };
+  }
+  if (end && end < now) {
+    return { label: `Ended ${formatShort(end)}`, tone: 'text-[var(--textMuted)]' };
+  }
+  if (end && end >= now) {
+    const diffDays = Math.ceil((end.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+    return { label: `${diffDays} day${diffDays === 1 ? '' : 's'} left`, tone: 'text-amber-500' };
+  }
+  return { label: 'Self-paced', tone: 'text-emerald-500' };
+}
+
+function formatShort(date: Date) {
+  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
+
+function formatLong(date: Date) {
+  return date.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+}
+

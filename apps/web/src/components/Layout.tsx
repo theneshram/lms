@@ -6,7 +6,7 @@ import { useTheme } from '../context/ThemeContext';
 const navLinks = [
   { to: '/dashboard', label: 'Dashboard', protected: true },
   { to: '/courses', label: 'Courses', protected: true },
-  { to: '/admin', label: 'Admin', roles: ['ADMIN'] as const },
+  { to: '/admin', label: 'Admin', roles: ['ADMIN', 'SUPER_ADMIN'] as const },
 ];
 
 export default function Layout({ children }: { children: React.ReactNode }) {
@@ -17,8 +17,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const appTitle = header?.applicationName || 'Learning Management System';
 
   return (
-    <div className="min-h-screen bg-[var(--background)] text-[var(--text)]">
-      <header className="backdrop-blur-sm bg-white/70 dark:bg-slate-900/70 border-b border-slate-200/40 dark:border-slate-800/60 sticky top-0 z-40">
+    <div className="min-h-screen flex flex-col bg-[var(--background)] text-[var(--text)] transition-colors">
+      <header className="backdrop-blur-sm bg-[var(--header-bg)] border-b border-[var(--border-soft)] sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-3 group">
             {header?.logoUrl ? (
@@ -56,7 +56,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             <button
               onClick={toggleMode}
               disabled={appearance?.allowUserToggle === false}
-              className="h-10 w-10 rounded-full border border-slate-200/60 dark:border-slate-700 flex items-center justify-center text-sm shadow-sm bg-white/60 dark:bg-slate-900/70 disabled:opacity-40"
+              className="h-10 w-10 rounded-full border border-[var(--border-soft)] flex items-center justify-center text-sm shadow-sm bg-[var(--surface)]/80 disabled:opacity-40"
               title="Toggle theme"
             >
               {mode === 'light' ? '🌞' : '🌙'}
@@ -91,20 +91,20 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         </div>
       </header>
 
-      <main className="relative">
+      <main className="relative flex-1 flex">
         <div className="absolute inset-0 -z-10 bg-gradient-to-br from-[var(--primary)]/10 via-transparent to-[var(--secondary)]/10" />
-        <div className="max-w-7xl mx-auto px-6 py-12">{children}</div>
+        <div className="relative z-10 flex-1 max-w-7xl w-full mx-auto px-6 py-12 flex flex-col">
+          <div className="flex-1 flex flex-col">{children}</div>
+        </div>
       </main>
 
-      <footer className="border-t border-slate-200/40 dark:border-slate-800/60 bg-white/70 dark:bg-slate-900/60">
+      <footer className="border-t border-[var(--border-soft)] bg-[var(--footer-bg)]">
         <div className="max-w-7xl mx-auto px-6 py-6 text-sm text-[var(--textMuted)] flex flex-col sm:flex-row items-center justify-between gap-2">
-          <div>
+          <div className="text-center sm:text-left">
             <p className="font-medium text-[var(--text)]">{footer?.organization || 'Aathith Prime Business Private Limited'}</p>
-            <p>
-              {footer?.customText || header?.title || 'Learning experiences crafted for every learner.'}
-            </p>
+            <p>{footer?.customText || header?.title || 'Learning experiences crafted for every learner.'}</p>
           </div>
-          <div className="text-xs uppercase tracking-widest">
+          <div className="text-xs uppercase tracking-widest text-[var(--textMuted)]">
             © {footer?.showYear === false ? '' : new Date().getFullYear() + ' '}
             {footer?.organization || 'Aathith Prime Business Private Limited'}. {footer?.legal || 'All rights reserved.'}
           </div>

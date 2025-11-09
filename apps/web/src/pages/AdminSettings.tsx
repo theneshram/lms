@@ -60,6 +60,17 @@ export default function AdminSettings() {
   const [emailState, setEmailState] = useState<SaveState>(null);
   const [dbState, setDbState] = useState<SaveState>(null);
   const { refresh } = useTheme();
+  const navSections = useMemo(
+    () => [
+      { id: 'branding', label: 'Branding & appearance' },
+      { id: 'smtp', label: 'Email & SMTP' },
+      { id: 'directory', label: 'Directory & SSO' },
+      { id: 'notifications', label: 'Notifications' },
+      { id: 'database', label: 'Database & backups' },
+    ],
+    []
+  );
+  const [activeNav, setActiveNav] = useState(navSections[0].id);
 
   useEffect(() => {
     async function load() {
@@ -72,6 +83,26 @@ export default function AdminSettings() {
     }
     load();
   }, []);
+
+  useEffect(() => {
+    if (!settings) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visible = entries
+          .filter((entry) => entry.isIntersecting)
+          .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
+        if (visible[0]?.target?.id) {
+          setActiveNav(visible[0].target.id);
+        }
+      },
+      { rootMargin: '-45% 0px -45% 0px', threshold: 0.2 }
+    );
+    navSections.forEach((section) => {
+      const el = document.getElementById(section.id);
+      if (el) observer.observe(el);
+    });
+    return () => observer.disconnect();
+  }, [navSections, settings]);
 
   const appearance = useMemo<AppearanceForm | undefined>(() => settings?.appearance, [settings]);
   const smtp = useMemo<SmtpForm | undefined>(() => settings?.mail?.smtp, [settings]);
@@ -226,16 +257,58 @@ export default function AdminSettings() {
 
   return (
     <Layout>
-      <div className="space-y-10">
-        <header className="space-y-2">
-          <p className="text-sm uppercase tracking-[0.3em] text-[var(--textMuted)]">System Configuration</p>
-          <h1 className="text-3xl font-semibold text-[var(--text)]">Admin customization studio</h1>
-          <p className="text-[var(--textMuted)] max-w-2xl">
-            Manage branding, theme palettes sourced from the Figma color library, email integrations, directory services, and database configuration from one place.
-          </p>
-        </header>
+      <div className="flex flex-col gap-10 lg:grid lg:grid-cols-[260px,1fr]">
+        <aside className="lg:pt-2">
+          <div className="hidden lg:block">
+            <nav className="sticky top-28 rounded-3xl border border-[var(--border-soft)] bg-[var(--nav-bg)]/80 backdrop-blur p-6 shadow-sm">
+              <p className="text-xs uppercase tracking-[0.3em] text-[var(--textMuted)] mb-4">Admin navigation</p>
+              <ul className="space-y-2 text-sm">
+                {navSections.map((section) => (
+                  <li key={section.id}>
+                    <a
+                      href={`#${section.id}`}
+                      onClick={() => setActiveNav(section.id)}
+                      className={`block rounded-xl px-3 py-2 transition hover:text-[var(--text)] ${
+                        activeNav === section.id
+                          ? 'bg-[var(--surface)] text-[var(--text)] shadow-sm'
+                          : 'text-[var(--textMuted)]'
+                      }`}
+                    >
+                      {section.label}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </nav>
+          </div>
+          <div className="lg:hidden -mx-2 flex gap-3 overflow-x-auto px-2 pb-4 text-sm">
+            {navSections.map((section) => (
+              <a
+                key={section.id}
+                href={`#${section.id}`}
+                onClick={() => setActiveNav(section.id)}
+                className={`whitespace-nowrap rounded-full border px-4 py-2 ${
+                  activeNav === section.id
+                    ? 'border-[var(--primary)] text-[var(--text)] bg-[var(--surface)]'
+                    : 'border-transparent bg-[var(--surface)]/70 text-[var(--textMuted)]'
+                }`}
+              >
+                {section.label}
+              </a>
+            ))}
+          </div>
+        </aside>
 
-        <section className="card p-8 space-y-6">
+        <div className="space-y-10">
+          <header className="space-y-2" id="overview">
+            <p className="text-sm uppercase tracking-[0.3em] text-[var(--textMuted)]">System Configuration</p>
+            <h1 className="text-3xl font-semibold text-[var(--text)]">Admin customization studio</h1>
+            <p className="text-[var(--textMuted)] max-w-2xl">
+              Manage branding, theme palettes sourced from the Figma color library, email integrations, directory services, and database configuration from one place.
+            </p>
+          </header>
+
+          <section id="branding" className="card p-8 space-y-6">
           <div className="flex items-center justify-between flex-wrap gap-4">
             <div>
               <h2 className="text-xl font-semibold text-[var(--text)]">Branding & appearance</h2>
@@ -267,14 +340,14 @@ export default function AdminSettings() {
                 type="text"
                 value={appearance.header?.title || ''}
                 onChange={(e) => updateHeader('title', e.target.value)}
-                className="w-full rounded-xl border border-slate-200/60 bg-white/70 px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/40"
+                className="w-full rounded-xl border border-[var(--border-soft)] bg-[var(--surface)]/80 px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/40"
               />
               <label className="block text-sm font-semibold text-[var(--text)]">Application name</label>
               <input
                 type="text"
                 value={appearance.header?.applicationName || ''}
                 onChange={(e) => updateHeader('applicationName', e.target.value)}
-                className="w-full rounded-xl border border-slate-200/60 bg-white/70 px-4 py-2 text-sm"
+                className="w-full rounded-xl border border-[var(--border-soft)] bg-[var(--surface)]/80 px-4 py-2 text-sm"
               />
               <label className="block text-sm font-semibold text-[var(--text)]">Logo URL</label>
               <input
@@ -282,7 +355,7 @@ export default function AdminSettings() {
                 value={appearance.header?.logoUrl || ''}
                 onChange={(e) => updateHeader('logoUrl', e.target.value)}
                 placeholder="https://cdn.example.com/logo.svg"
-                className="w-full rounded-xl border border-slate-200/60 bg-white/70 px-4 py-2 text-sm"
+                className="w-full rounded-xl border border-[var(--border-soft)] bg-[var(--surface)]/80 px-4 py-2 text-sm"
               />
             </div>
             <div className="space-y-4">
@@ -291,20 +364,20 @@ export default function AdminSettings() {
                 type="text"
                 value={appearance.footer?.organization || ''}
                 onChange={(e) => updateFooter('organization', e.target.value)}
-                className="w-full rounded-xl border border-slate-200/60 bg-white/70 px-4 py-2 text-sm"
+                className="w-full rounded-xl border border-[var(--border-soft)] bg-[var(--surface)]/80 px-4 py-2 text-sm"
               />
               <label className="block text-sm font-semibold text-[var(--text)]">Footer legal text</label>
               <input
                 type="text"
                 value={appearance.footer?.legal || ''}
                 onChange={(e) => updateFooter('legal', e.target.value)}
-                className="w-full rounded-xl border border-slate-200/60 bg-white/70 px-4 py-2 text-sm"
+                className="w-full rounded-xl border border-[var(--border-soft)] bg-[var(--surface)]/80 px-4 py-2 text-sm"
               />
               <label className="block text-sm font-semibold text-[var(--text)]">Footer custom message</label>
               <textarea
                 value={appearance.footer?.customText || ''}
                 onChange={(e) => updateFooter('customText', e.target.value)}
-                className="w-full rounded-xl border border-slate-200/60 bg-white/70 px-4 py-2 text-sm"
+                className="w-full rounded-xl border border-[var(--border-soft)] bg-[var(--surface)]/80 px-4 py-2 text-sm"
                 rows={3}
               />
               <label className="inline-flex items-center gap-2 text-sm text-[var(--text)]">
@@ -324,7 +397,7 @@ export default function AdminSettings() {
               <select
                 value={appearance.themeMode}
                 onChange={(e) => updateAppearance({ themeMode: e.target.value as AppearanceForm['themeMode'] })}
-                className="w-full rounded-xl border border-slate-200/60 bg-white/70 px-4 py-2 text-sm"
+                className="w-full rounded-xl border border-[var(--border-soft)] bg-[var(--surface)]/80 px-4 py-2 text-sm"
               >
                 <option value="SYSTEM">Follow system preference</option>
                 <option value="LIGHT">Always light</option>
@@ -344,7 +417,7 @@ export default function AdminSettings() {
               <select
                 value={appearance.typography?.heading || ''}
                 onChange={(e) => updateTypography('heading', e.target.value)}
-                className="w-full rounded-xl border border-slate-200/60 bg-white/70 px-4 py-2 text-sm"
+                className="w-full rounded-xl border border-[var(--border-soft)] bg-[var(--surface)]/80 px-4 py-2 text-sm"
               >
                 <option value="">Default (Inter)</option>
                 {fonts.map((font) => (
@@ -359,7 +432,7 @@ export default function AdminSettings() {
               <select
                 value={appearance.typography?.body || ''}
                 onChange={(e) => updateTypography('body', e.target.value)}
-                className="w-full rounded-xl border border-slate-200/60 bg-white/70 px-4 py-2 text-sm"
+                className="w-full rounded-xl border border-[var(--border-soft)] bg-[var(--surface)]/80 px-4 py-2 text-sm"
               >
                 <option value="">Default (Inter)</option>
                 {fonts.map((font) => (
@@ -402,7 +475,7 @@ export default function AdminSettings() {
           </div>
         </section>
 
-        <section className="card p-8 space-y-6">
+        <section id="smtp" className="card p-8 space-y-6">
           <div className="flex items-center justify-between flex-wrap gap-4">
             <div>
               <h2 className="text-xl font-semibold text-[var(--text)]">SMTP email setup</h2>
@@ -426,14 +499,14 @@ export default function AdminSettings() {
               value={smtp?.host || ''}
               onChange={(e) => updateSmtp('host', e.target.value)}
               placeholder="SMTP host"
-              className="rounded-xl border border-slate-200/60 bg-white/70 px-4 py-2 text-sm"
+              className="rounded-xl border border-[var(--border-soft)] bg-[var(--surface)]/80 px-4 py-2 text-sm"
             />
             <input
               type="number"
               value={smtp?.port ?? 587}
               onChange={(e) => updateSmtp('port', Number(e.target.value))}
               placeholder="Port"
-              className="rounded-xl border border-slate-200/60 bg-white/70 px-4 py-2 text-sm"
+              className="rounded-xl border border-[var(--border-soft)] bg-[var(--surface)]/80 px-4 py-2 text-sm"
             />
             <label className="inline-flex items-center gap-2 text-sm text-[var(--text)]">
               <input
@@ -448,28 +521,28 @@ export default function AdminSettings() {
               value={smtp?.user || ''}
               onChange={(e) => updateSmtp('user', e.target.value)}
               placeholder="Username"
-              className="rounded-xl border border-slate-200/60 bg-white/70 px-4 py-2 text-sm"
+              className="rounded-xl border border-[var(--border-soft)] bg-[var(--surface)]/80 px-4 py-2 text-sm"
             />
             <input
               type="password"
               value={smtp?.password || ''}
               onChange={(e) => updateSmtp('password', e.target.value)}
               placeholder="Password / App token"
-              className="rounded-xl border border-slate-200/60 bg-white/70 px-4 py-2 text-sm"
+              className="rounded-xl border border-[var(--border-soft)] bg-[var(--surface)]/80 px-4 py-2 text-sm"
             />
             <input
               type="text"
               value={smtp?.fromName || ''}
               onChange={(e) => updateSmtp('fromName', e.target.value)}
               placeholder="From name"
-              className="rounded-xl border border-slate-200/60 bg-white/70 px-4 py-2 text-sm"
+              className="rounded-xl border border-[var(--border-soft)] bg-[var(--surface)]/80 px-4 py-2 text-sm"
             />
             <input
               type="email"
               value={smtp?.fromEmail || ''}
               onChange={(e) => updateSmtp('fromEmail', e.target.value)}
               placeholder="From email"
-              className="rounded-xl border border-slate-200/60 bg-white/70 px-4 py-2 text-sm"
+              className="rounded-xl border border-[var(--border-soft)] bg-[var(--surface)]/80 px-4 py-2 text-sm"
             />
           </div>
 
@@ -479,7 +552,7 @@ export default function AdminSettings() {
               value={emailTest}
               onChange={(e) => setEmailTest(e.target.value)}
               placeholder="Send test email to"
-              className="rounded-full border border-slate-200/60 bg-white/70 px-4 py-2 text-sm"
+              className="rounded-full border border-[var(--border-soft)] bg-[var(--surface)]/80 px-4 py-2 text-sm"
             />
             <button
               type="button"
@@ -491,7 +564,7 @@ export default function AdminSettings() {
           </div>
         </section>
 
-        <section className="card p-8 space-y-6">
+        <section id="directory" className="card p-8 space-y-6">
           <div className="flex items-center justify-between flex-wrap gap-4">
             <div>
               <h2 className="text-xl font-semibold text-[var(--text)]">Directory & SSO</h2>
@@ -505,7 +578,7 @@ export default function AdminSettings() {
               <select
                 value={directory.provider || 'NONE'}
                 onChange={(e) => updateDirectory('provider', e.target.value)}
-                className="w-full rounded-xl border border-slate-200/60 bg-white/70 px-4 py-2 text-sm"
+                className="w-full rounded-xl border border-[var(--border-soft)] bg-[var(--surface)]/80 px-4 py-2 text-sm"
               >
                 <option value="NONE">Disabled</option>
                 <option value="AZURE_AD">Azure Active Directory</option>
@@ -525,7 +598,7 @@ export default function AdminSettings() {
               <select
                 value={directory.defaultRole || 'STUDENT'}
                 onChange={(e) => updateDirectory('defaultRole', e.target.value)}
-                className="w-full rounded-xl border border-slate-200/60 bg-white/70 px-4 py-2 text-sm"
+                className="w-full rounded-xl border border-[var(--border-soft)] bg-[var(--surface)]/80 px-4 py-2 text-sm"
               >
                 {roleOptions.map((option) => (
                   <option key={option.value} value={option.value}>
@@ -540,21 +613,21 @@ export default function AdminSettings() {
                 value={directory.domain || ''}
                 onChange={(e) => updateDirectory('domain', e.target.value)}
                 placeholder="Tenant domain"
-                className="w-full rounded-xl border border-slate-200/60 bg-white/70 px-4 py-2 text-sm"
+                className="w-full rounded-xl border border-[var(--border-soft)] bg-[var(--surface)]/80 px-4 py-2 text-sm"
               />
               <input
                 type="url"
                 value={directory.metadataUrl || ''}
                 onChange={(e) => updateDirectory('metadataUrl', e.target.value)}
                 placeholder="Metadata URL"
-                className="w-full rounded-xl border border-slate-200/60 bg-white/70 px-4 py-2 text-sm"
+                className="w-full rounded-xl border border-[var(--border-soft)] bg-[var(--surface)]/80 px-4 py-2 text-sm"
               />
               <input
                 type="text"
                 value={directory.clientId || ''}
                 onChange={(e) => updateDirectory('clientId', e.target.value)}
                 placeholder="Client ID"
-                className="w-full rounded-xl border border-slate-200/60 bg-white/70 px-4 py-2 text-sm"
+                className="w-full rounded-xl border border-[var(--border-soft)] bg-[var(--surface)]/80 px-4 py-2 text-sm"
               />
               <input
                 type="password"

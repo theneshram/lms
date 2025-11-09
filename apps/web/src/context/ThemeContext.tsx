@@ -6,6 +6,8 @@ type Palette = {
   name: string;
   description?: string;
   colors: Record<string, string>;
+  colorsDark?: Record<string, string>;
+  colorsLight?: Record<string, string>;
 };
 
 type AppearanceResponse = {
@@ -106,22 +108,103 @@ function applyAppearance(appearance: AppearanceResponse | undefined, mode: 'ligh
   } else {
     root.classList.remove('dark');
   }
+
+  const fallback: Record<string, string> =
+    mode === 'dark'
+      ? {
+          primary: '#6366F1',
+          secondary: '#8B5CF6',
+          accent: '#F59E0B',
+          background: '#0F172A',
+          surface: '#1E293B',
+          muted: '#1F2937',
+          text: '#F8FAFC',
+          textMuted: '#CBD5F5',
+          border: '#475569',
+          'border-soft': 'rgba(100, 116, 139, 0.35)',
+          'header-bg': 'rgba(15, 23, 42, 0.85)',
+          'footer-bg': 'rgba(15, 23, 42, 0.82)',
+          'nav-bg': 'rgba(30, 41, 59, 0.7)',
+        }
+      : {
+          primary: '#6366F1',
+          secondary: '#8B5CF6',
+          accent: '#F59E0B',
+          background: '#F8FAFC',
+          surface: '#FFFFFF',
+          muted: '#E2E8F0',
+          text: '#0F172A',
+          textMuted: '#475569',
+          border: '#CBD5F5',
+          'border-soft': 'rgba(148, 163, 184, 0.25)',
+          'header-bg': 'rgba(255, 255, 255, 0.85)',
+          'footer-bg': 'rgba(255, 255, 255, 0.82)',
+          'nav-bg': 'rgba(255, 255, 255, 0.6)',
+        };
+
   const palette = appearance?.palette;
-  if (!palette) return;
-  const colors = palette.colors || {};
-  Object.entries(colors).forEach(([key, value]) => {
-    root.style.setProperty(`--${key}`, value);
+  const baseColors = palette ? filterColorRecord(palette.colors) : {};
+  const lightOverrides = filterColorRecord(palette?.colorsLight ?? {});
+  const darkOverrides = filterColorRecord(palette?.colorsDark ?? {});
+  const overrideColors = mode === 'dark' ? darkOverrides : lightOverrides;
+
+  const protectedKeys = new Set([
+    'background',
+    'surface',
+    'muted',
+    'text',
+    'textMuted',
+    'header-bg',
+    'footer-bg',
+    'nav-bg',
+    'border',
+    'border-soft',
+    'headerBg',
+    'footerBg',
+    'navBg',
+    'text-muted',
+    'text-muted-alt',
+  ]);
+
+  const finalColors: Record<string, string> = { ...fallback };
+  Object.entries(baseColors).forEach(([key, value]) => {
+    if (mode === 'dark' && protectedKeys.has(key) && !(key in darkOverrides)) {
+      return;
+    }
+    finalColors[key] = value;
   });
-  if (mode === 'dark' && colors.background && colors.surface) {
-    root.style.setProperty('--background', colors.background);
-    root.style.setProperty('--surface', colors.surface);
-    root.style.setProperty('--text', colors.text ?? '#F8FAFC');
+  Object.entries(overrideColors).forEach(([key, value]) => {
+    finalColors[key] = value;
+  });
+
+  // Ensure both camelCase and kebab-case aliases stay in sync
+  if (finalColors.borderSoft && !finalColors['border-soft']) {
+    finalColors['border-soft'] = finalColors.borderSoft;
   }
+  if (finalColors['border-soft'] && !finalColors.borderSoft) {
+    finalColors.borderSoft = finalColors['border-soft'];
+  }
+  if (finalColors.headerBg && !finalColors['header-bg']) {
+    finalColors['header-bg'] = finalColors.headerBg;
+  }
+  if (finalColors.footerBg && !finalColors['footer-bg']) {
+    finalColors['footer-bg'] = finalColors.footerBg;
+  }
+  if (finalColors.navBg && !finalColors['nav-bg']) {
+    finalColors['nav-bg'] = finalColors.navBg;
+  }
+
+  Object.entries(finalColors).forEach(([key, value]) => {
+    if (typeof value === 'string' && value) {
+      setCssVariable(root, key, value);
+    }
+  });
+
   if (appearance?.typography?.heading) {
-    root.style.setProperty('--font-heading', `'${appearance.typography.heading}', sans-serif`);
+    setCssVariable(root, 'font-heading', `'${appearance.typography.heading}', sans-serif`);
   }
   if (appearance?.typography?.body) {
-    root.style.setProperty('--font-body', `'${appearance.typography.body}', sans-serif`);
+    setCssVariable(root, 'font-body', `'${appearance.typography.body}', sans-serif`);
   }
 }
 
@@ -140,4 +223,23 @@ function loadFont(font?: string) {
   link.rel = 'stylesheet';
   link.href = href;
   document.head.appendChild(link);
+}
+
+function filterColorRecord(record: Record<string, string> | undefined) {
+  if (!record) return {};
+  return Object.entries(record).reduce<Record<string, string>>((acc, [key, value]) => {
+    if (typeof value === 'string') acc[key] = value;
+    return acc;
+  }, {});
+}
+
+function setCssVariable(root: HTMLElement, key: string, value: string) {
+  root.style.setProperty(`--${key}`, value);
+  if (key.includes('-')) {
+    const camelKey = key.replace(/-([a-z])/g, (_, char) => char.toUpperCase());
+    root.style.setProperty(`--${camelKey}`, value);
+  } else if (/[A-Z]/.test(key)) {
+    const kebabKey = key.replace(/([A-Z])/g, '-$1').toLowerCase();
+    root.style.setProperty(`--${kebabKey}`, value);
+  }
 }

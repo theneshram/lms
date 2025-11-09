@@ -4,7 +4,7 @@ const EnrollmentSchema = new mongoose.Schema({
   course: { type: mongoose.Schema.Types.ObjectId, ref: 'Course', index: true },
   user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', index: true },
   role: { type: String, enum: ['TEACHER', 'TA', 'STUDENT'], default: 'STUDENT' },
-  status: { type: String, enum: ['ACTIVE', 'PENDING', 'WAITLISTED', 'EXPIRED'], default: 'ACTIVE' },
+  status: { type: String, enum: ['ACTIVE', 'PENDING', 'WAITLISTED', 'EXPIRED', 'COMPLETED'], default: 'ACTIVE' },
   expiresAt: Date,
   enrolledBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   enrollmentSource: { type: String, enum: ['MANUAL', 'SELF', 'BATCH', 'API'], default: 'MANUAL' },

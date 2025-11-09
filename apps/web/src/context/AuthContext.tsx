@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { api } from '../lib/api';
 
-type Role = 'ADMIN' | 'TEACHER' | 'TA' | 'STUDENT';
+type Role = 'SUPER_ADMIN' | 'ADMIN' | 'TEACHER' | 'TA' | 'STUDENT';
 type User = { id: string; name: string; email: string; role: Role } | null;
 
 type Ctx = {

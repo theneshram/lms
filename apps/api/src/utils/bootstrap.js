@@ -12,15 +12,15 @@ export async function ensureSuperAdmin(adminConfig = {}) {
 
   const existing = await User.findOne({ email }).select('+password');
   if (!existing) {
-    await User.create({ name, email, password, role: 'ADMIN', status: 'ACTIVE' });
+    await User.create({ name, email, password, role: 'SUPER_ADMIN', status: 'ACTIVE' });
     console.log(`[bootstrap] created super admin account for ${email}`);
     return;
   }
 
   let updated = false;
   let passwordRefreshed = false;
-  if (existing.role !== 'ADMIN') {
-    existing.role = 'ADMIN';
+  if (existing.role !== 'SUPER_ADMIN') {
+    existing.role = 'SUPER_ADMIN';
     updated = true;
   }
   if (existing.status !== 'ACTIVE') {
