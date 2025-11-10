@@ -7,6 +7,7 @@ import SystemSetting from '../models/SystemSetting.js';
 import { asyncHandler } from '../utils/error.js';
 import { logActivity } from '../utils/activity.js';
 import { sendTemplateMail } from '../services/mailer.js';
+import { autoEnrollDemoCourse } from '../utils/bootstrap.js';
 
 const router = Router();
 
@@ -23,6 +24,7 @@ router.post(
     const user = await User.create({ name, email, password, role, profile });
     await logActivity({ user: user._id, action: 'USER_REGISTERED', entityType: 'USER', entityId: user._id, metadata: { role }, req });
     await sendTemplateMail('user-welcome', { to: user.email, context: { name: user.name } }).catch(() => {});
+    await autoEnrollDemoCourse(user).catch(() => {});
     res.json({ id: user._id });
   })
 );
@@ -64,9 +66,11 @@ router.post(
       });
       await logActivity({ user: user._id, action: 'USER_SSO_CREATED', entityType: 'USER', entityId: user._id, req });
       await sendTemplateMail('user-welcome', { to: user.email, context: { name: user.name } }).catch(() => {});
+      await autoEnrollDemoCourse(user).catch(() => {});
     } else {
       user.sso = { provider, providerId: externalId || user.sso?.providerId || email, metadata: req.body.metadata };
       await user.save();
+      await autoEnrollDemoCourse(user).catch(() => {});
     }
     const token = signToken(user);
     await logActivity({ user: user._id, action: 'USER_SSO_LOGIN', entityType: 'USER', entityId: user._id, req });

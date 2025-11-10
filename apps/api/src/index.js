@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import morgan from 'morgan';
+import fs from 'fs/promises';
 import { connectDB } from './db.js';
 import { config } from './config.js';
 
@@ -23,7 +24,7 @@ import gamificationRoutes from './routes/gamification.js';
 import ecommerceRoutes from './routes/ecommerce.js';
 import publicRoutes from './routes/public.js';
 import { startNotificationScheduler } from './services/notificationScheduler.js';
-import { ensureSuperAdmin } from './utils/bootstrap.js';
+import { ensureSuperAdmin, ensureDemoCourse } from './utils/bootstrap.js';
 
 const app = express();
 app.use(cors({ origin: config.corsOrigin, credentials: true }));
@@ -55,10 +56,20 @@ app.use((err, req, res, next) => {
   res.status(500).json({ message: 'Server error' });
 });
 
+async function ensureStorageRoot() {
+  try {
+    await fs.mkdir(config.storageRoot, { recursive: true });
+  } catch (error) {
+    console.error('[storage] Unable to prepare storage root', error);
+  }
+}
+
 async function start() {
   try {
+    await ensureStorageRoot();
     await connectDB();
     await ensureSuperAdmin(config.admin);
+    await ensureDemoCourse();
     startNotificationScheduler();
     app.listen(config.port, () => console.log(`🚀 API running on port ${config.port}`));
   } catch (error) {

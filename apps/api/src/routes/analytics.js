@@ -11,6 +11,7 @@ import ReportSchedule from '../models/ReportSchedule.js';
 import VirtualSession from '../models/VirtualSession.js';
 import Announcement from '../models/Announcement.js';
 import Quiz from '../models/Quiz.js';
+import SystemSetting from '../models/SystemSetting.js';
 import { asyncHandler } from '../utils/error.js';
 
 const router = Router();
@@ -273,6 +274,55 @@ router.get(
       openCourseCount: openCourses.length,
     };
 
+    const settings = await SystemSetting.getSingleton();
+    const demoConfig = settings.demoCourse ?? {};
+    let demoCourseDoc = null;
+    const demoCourseCode = demoConfig.code || 'DEMO-COURSE';
+    if (demoConfig.courseId) {
+      demoCourseDoc = await Course.findById(demoConfig.courseId)
+        .select('title description startDate endDate modules resources image visibility code')
+        .lean();
+    }
+    if (!demoCourseDoc && demoCourseCode) {
+      demoCourseDoc = await Course.findOne({ code: demoCourseCode })
+        .select('title description startDate endDate modules resources image visibility code')
+        .lean();
+    }
+
+    const demoCourseSummary = (() => {
+      if (!demoCourseDoc) {
+        return {
+          code: demoCourseCode,
+          autoEnroll: demoConfig.autoEnroll !== false,
+          highlight: demoConfig.highlight,
+          enrolled: false,
+        };
+      }
+      const demoId = demoCourseDoc._id.toString();
+      const enrolled = enrollments.some((enrollment) => enrollment.course?._id?.toString() === demoId);
+      const assignmentsForDemo = assignmentsByCourse.get(demoId) ?? [];
+      const quizzesForDemo = quizzesByCourse.get(demoId) ?? [];
+      const sessionsForDemo = sessionsByCourse.get(demoId) ?? [];
+      return {
+        courseId: demoCourseDoc._id,
+        code: demoCourseDoc.code || demoCourseCode,
+        title: demoCourseDoc.title,
+        description: demoCourseDoc.description,
+        image: demoCourseDoc.image,
+        startDate: demoCourseDoc.startDate,
+        endDate: demoCourseDoc.endDate,
+        modules: Array.isArray(demoCourseDoc.modules) ? demoCourseDoc.modules.length : 0,
+        resources: Array.isArray(demoCourseDoc.resources) ? demoCourseDoc.resources.length : 0,
+        assignments: assignmentsForDemo.length,
+        quizzes: quizzesForDemo.length,
+        upcomingSessions: sessionsForDemo.length,
+        autoEnroll: demoConfig.autoEnroll !== false,
+        highlight: demoConfig.highlight,
+        enrolled,
+        quizId: demoConfig.quizId,
+      };
+    })();
+
     res.json({
       enrollments,
       openCourses,
@@ -283,6 +333,7 @@ router.get(
       progress: progressSummaries,
       calendarHighlights,
       courseIds: courseIdStrings,
+      demoCourse: demoCourseSummary,
     });
   })
 );

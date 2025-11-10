@@ -142,6 +142,78 @@ const NotificationPreferenceSchema = new mongoose.Schema(
   { _id: false }
 );
 
+const StorageLimitSchema = new mongoose.Schema(
+  {
+    maxFileSizeMb: { type: Number, default: 512 },
+    totalQuotaGb: { type: Number, default: 20 },
+    allowVideos: { type: Boolean, default: true },
+    allowDocuments: { type: Boolean, default: true },
+    allowImages: { type: Boolean, default: true },
+    allowScorm: { type: Boolean, default: true },
+  },
+  { _id: false }
+);
+
+const StorageSchema = new mongoose.Schema(
+  {
+    provider: {
+      type: String,
+      enum: ['LOCAL', 'AWS_S3', 'AZURE_BLOB', 'GCP', 'ONEDRIVE'],
+      default: 'LOCAL',
+    },
+    local: {
+      root: { type: String, default: 'storage/uploads' },
+      baseUrl: String,
+    },
+    aws: {
+      bucket: String,
+      region: String,
+      accessKeyId: String,
+      secretAccessKey: String,
+    },
+    azure: {
+      connectionString: String,
+      container: String,
+    },
+    gcp: {
+      bucket: String,
+      projectId: String,
+      credentialsJson: String,
+    },
+    onedrive: {
+      clientId: String,
+      clientSecret: String,
+      tenantId: String,
+      driveId: String,
+    },
+    uploadLimits: { type: StorageLimitSchema, default: () => ({}) },
+    archiveAfterDays: Number,
+  },
+  { _id: false }
+);
+
+const DemoCourseSchema = new mongoose.Schema(
+  {
+    code: { type: String, default: 'DEMO-COURSE' },
+    courseId: { type: mongoose.Schema.Types.ObjectId, ref: 'Course' },
+    quizId: { type: mongoose.Schema.Types.ObjectId, ref: 'Quiz' },
+    autoEnroll: { type: Boolean, default: true },
+    highlight: String,
+    lastRefreshedAt: Date,
+  },
+  { _id: false }
+);
+
+const ObservabilitySchema = new mongoose.Schema(
+  {
+    enableStorageTelemetry: { type: Boolean, default: true },
+    enableUserPresence: { type: Boolean, default: true },
+    enableActivityStream: { type: Boolean, default: true },
+    retentionDays: { type: Number, default: 30 },
+  },
+  { _id: false }
+);
+
 const defaultPalettes = [
   {
     id: 'sunrise-horizon',
@@ -379,6 +451,9 @@ const SystemSettingSchema = new mongoose.Schema(
       }),
     },
     notifications: { type: NotificationPreferenceSchema, default: () => ({}) },
+    storage: { type: StorageSchema, default: () => ({}) },
+    demoCourse: { type: DemoCourseSchema, default: () => ({}) },
+    observability: { type: ObservabilitySchema, default: () => ({}) },
     apiKeys: mongoose.Schema.Types.Mixed,
     integrations: mongoose.Schema.Types.Mixed,
     dataRetentionDays: { type: Number, default: 365 },
@@ -407,6 +482,18 @@ SystemSettingSchema.statics.getSingleton = async function getSingleton() {
         ...(existing.mail?.toObject?.() ?? existing.mail ?? {}),
         templates: defaultTemplates.map((template) => ({ ...template })),
       };
+      await existing.save();
+    }
+    if (!existing.storage) {
+      existing.storage = {};
+      await existing.save();
+    }
+    if (!existing.demoCourse) {
+      existing.demoCourse = {};
+      await existing.save();
+    }
+    if (!existing.observability) {
+      existing.observability = {};
       await existing.save();
     }
     return existing;

@@ -22,7 +22,7 @@ const features = [
 const quickActions = [
   { label: 'View Dashboard', to: '/dashboard' },
   { label: 'Explore Courses', to: '/courses' },
-  { label: 'Admin Console', to: '/admin', roles: ['ADMIN'] as const },
+  { label: 'Admin Console', to: '/admin', roles: ['ADMIN', 'SUPER_ADMIN'] as const },
 ];
 
 export default function App() {

@@ -28,4 +28,6 @@ export const config = {
     password: process.env.ADMIN_PASSWORD,
     name: process.env.ADMIN_NAME || 'Super Admin',
   },
+
+  storageRoot: process.env.STORAGE_ROOT || path.resolve(__dirname, '../../storage/uploads'),
 };
