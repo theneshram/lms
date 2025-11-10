@@ -1,5 +1,13 @@
+import path from 'path';
+import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
-dotenv.config();
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const localEnvPath = path.resolve(__dirname, '../.env');
+const rootEnvPath = path.resolve(__dirname, '../../.env');
+
+dotenv.config({ path: localEnvPath });
+dotenv.config({ path: rootEnvPath, override: true });
 
 export const config = {
   port: process.env.PORT || 8080,
@@ -14,4 +22,12 @@ export const config = {
 
   jwtSecret: process.env.JWT_SECRET || 'dev_secret',
   corsOrigin: process.env.CORS_ORIGIN || 'http://localhost:5173',
+
+  admin: {
+    email: process.env.ADMIN_EMAIL,
+    password: process.env.ADMIN_PASSWORD,
+    name: process.env.ADMIN_NAME || 'Super Admin',
+  },
+
+  storageRoot: process.env.STORAGE_ROOT || path.resolve(__dirname, '../../storage/uploads'),
 };

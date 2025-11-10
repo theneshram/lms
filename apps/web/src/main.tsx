@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client';
 import { createBrowserRouter, RouterProvider } from 'react-router-dom';
 import './styles/index.css';
 import { AuthProvider } from './context/AuthContext';
+import { ThemeProvider } from './context/ThemeContext';
 import App from './App';
 import Login from './pages/Login';
 import Register from './pages/Register';
@@ -25,13 +26,15 @@ const router = createBrowserRouter([
   { path: '/courses/:id/assignments', element: <ProtectedRoute><Assignments/></ProtectedRoute> },
   { path: '/assignments/:id/submit', element: <ProtectedRoute allow={["STUDENT"]}><AssignmentSubmit/></ProtectedRoute> },
   { path: '/quizzes/:id/take', element: <ProtectedRoute allow={["STUDENT"]}><QuizTake/></ProtectedRoute> },
-  { path: '/admin', element: <ProtectedRoute allow={["ADMIN"]}><AdminSettings/></ProtectedRoute> },
+  { path: '/admin', element: <ProtectedRoute allow={["ADMIN", "SUPER_ADMIN"]}><AdminSettings/></ProtectedRoute> },
 ]);
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <AuthProvider>
-      <RouterProvider router={router} />
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <RouterProvider router={router} />
+      </AuthProvider>
+    </ThemeProvider>
   </React.StrictMode>
 );
