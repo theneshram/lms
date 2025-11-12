@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { FormEvent, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import Layout from '../components/Layout';
 import { api } from '../lib/api';
@@ -152,6 +152,19 @@ export default function AdminSettings() {
   const [dbState, setDbState] = useState<SaveState>(null);
   const [overview, setOverview] = useState<AdminOverview | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [userForm, setUserForm] = useState({ name: '', email: '', password: '', role: 'STUDENT' });
+  const [userSubmitting, setUserSubmitting] = useState(false);
+  const [userFormState, setUserFormState] = useState<SaveState>(null);
+  const [courseForm, setCourseForm] = useState({
+    title: '',
+    code: '',
+    description: '',
+    visibility: 'PRIVATE',
+    startDate: '',
+    endDate: '',
+  });
+  const [courseSubmitting, setCourseSubmitting] = useState(false);
+  const [courseFormState, setCourseFormState] = useState<SaveState>(null);
   const { refresh } = useTheme();
   const navSections = useMemo(
     () => [
@@ -169,6 +182,15 @@ export default function AdminSettings() {
     []
   );
   const [activeNav, setActiveNav] = useState(navSections[0].id);
+
+  const refreshOverview = async () => {
+    try {
+      const response = await api.get<AdminOverview>('/admin/overview');
+      setOverview(response.data);
+    } catch (error) {
+      console.warn('Unable to refresh admin overview metrics', error);
+    }
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -227,7 +249,18 @@ export default function AdminSettings() {
     return () => observer.disconnect();
   }, [navSections, settings]);
 
-  const appearance = useMemo<AppearanceForm | undefined>(() => settings?.appearance, [settings]);
+  const appearance = useMemo<AppearanceForm>(() => {
+    return (
+      settings?.appearance ?? {
+        themeMode: 'SYSTEM',
+        palettes: [],
+        typography: {},
+        header: {},
+        footer: {},
+        allowUserToggle: true,
+      }
+    );
+  }, [settings]);
   const smtp = useMemo<SmtpForm | undefined>(() => settings?.mail?.smtp, [settings]);
   const directory = useMemo(() => settings?.directory ?? {}, [settings]);
   const notifications = useMemo(() => settings?.notifications ?? {}, [settings]);
@@ -256,6 +289,70 @@ export default function AdminSettings() {
 
   function updateFooter(field: string, value: string | boolean) {
     updateAppearance({ footer: { ...appearance?.footer, [field]: value } });
+  }
+
+  async function handleCreateUser(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setUserFormState(null);
+    if (!userForm.name.trim() || !userForm.email.trim() || !userForm.password.trim()) {
+      setUserFormState({ message: 'Provide name, email, and a temporary password.', tone: 'error' });
+      return;
+    }
+
+    setUserSubmitting(true);
+    try {
+      await api.post('/users', {
+        name: userForm.name.trim(),
+        email: userForm.email.trim(),
+        password: userForm.password,
+        role: userForm.role,
+      });
+      setUserForm({ name: '', email: '', password: '', role: 'STUDENT' });
+      setUserFormState({ message: 'User created successfully.', tone: 'success' });
+      await refreshOverview();
+    } catch (error: any) {
+      const message = error?.response?.data?.message ?? 'Unable to create user right now.';
+      setUserFormState({ message, tone: 'error' });
+    } finally {
+      setUserSubmitting(false);
+    }
+  }
+
+  async function handleCreateCourse(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setCourseFormState(null);
+    if (!courseForm.title.trim() || !courseForm.code.trim()) {
+      setCourseFormState({ message: 'Provide a course title and unique code.', tone: 'error' });
+      return;
+    }
+
+    setCourseSubmitting(true);
+    try {
+      const payload = {
+        title: courseForm.title.trim(),
+        code: courseForm.code.trim(),
+        description: courseForm.description?.trim() || undefined,
+        visibility: courseForm.visibility,
+        startDate: courseForm.startDate || undefined,
+        endDate: courseForm.endDate || undefined,
+      };
+      await api.post('/courses', payload);
+      setCourseForm({
+        title: '',
+        code: '',
+        description: '',
+        visibility: payload.visibility,
+        startDate: '',
+        endDate: '',
+      });
+      setCourseFormState({ message: 'Course created successfully.', tone: 'success' });
+      await refreshOverview();
+    } catch (error: any) {
+      const message = error?.response?.data?.message ?? 'Unable to create course right now.';
+      setCourseFormState({ message, tone: 'error' });
+    } finally {
+      setCourseSubmitting(false);
+    }
   }
 
   function updateTypography(field: 'heading' | 'body', value: string) {
@@ -463,7 +560,7 @@ export default function AdminSettings() {
   }
 
 
-  if (!settings || !appearance) {
+  if (!settings) {
     return (
       <Layout>
         <div className="space-y-4 py-16 text-[var(--textMuted)]">
@@ -645,11 +742,11 @@ export default function AdminSettings() {
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
-        <div className="rounded-2xl border border-[var(--border-soft)] bg-[var(--surface)]/80 p-5 space-y-3">
+        <div className="rounded-2xl border border-[var(--border-soft)] bg-[var(--surface)]/80 p-5 space-y-4">
           <div>
             <h3 className="text-sm font-semibold text-[var(--text)]">User administration</h3>
             <p className="text-xs text-[var(--textMuted)]">
-              Assign roles, review activity trails, and export the roster for provisioning.
+              Assign roles, review activity trails, and create accounts with a single invite password.
             </p>
           </div>
           <div className="grid grid-cols-2 gap-2 text-xs text-[var(--textMuted)]">
@@ -670,15 +767,88 @@ export default function AdminSettings() {
               <p>{overview?.counts.users.total.toLocaleString?.() ?? '—'}</p>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={() => window.open('/api/users', '_blank')}
-            className="inline-flex items-center justify-center rounded-full border border-[var(--border-soft)] px-4 py-2 text-xs font-semibold text-[var(--text)] transition hover:border-[var(--primary)]/60 hover:text-[var(--primary)]"
-          >
-            Open user directory API
-          </button>
+          <form onSubmit={handleCreateUser} className="space-y-3 text-xs">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="space-y-1 text-[var(--textMuted)]">
+                <span className="font-semibold text-[var(--text)]">Full name</span>
+                <input
+                  type="text"
+                  value={userForm.name}
+                  onChange={(event) => setUserForm((prev) => ({ ...prev, name: event.target.value }))}
+                  className="w-full rounded-xl border border-[var(--border-soft)] bg-[var(--surface)] px-3 py-2 text-[var(--text)] focus:border-[var(--primary)] focus:outline-none"
+                  placeholder="Jane Doe"
+                  required
+                />
+              </label>
+              <label className="space-y-1 text-[var(--textMuted)]">
+                <span className="font-semibold text-[var(--text)]">Email</span>
+                <input
+                  type="email"
+                  value={userForm.email}
+                  onChange={(event) => setUserForm((prev) => ({ ...prev, email: event.target.value }))}
+                  className="w-full rounded-xl border border-[var(--border-soft)] bg-[var(--surface)] px-3 py-2 text-[var(--text)] focus:border-[var(--primary)] focus:outline-none"
+                  placeholder="user@example.com"
+                  required
+                />
+              </label>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="space-y-1 text-[var(--textMuted)]">
+                <span className="font-semibold text-[var(--text)]">Temporary password</span>
+                <input
+                  type="text"
+                  value={userForm.password}
+                  onChange={(event) => setUserForm((prev) => ({ ...prev, password: event.target.value }))}
+                  className="w-full rounded-xl border border-[var(--border-soft)] bg-[var(--surface)] px-3 py-2 text-[var(--text)] focus:border-[var(--primary)] focus:outline-none"
+                  placeholder="Assign a starter password"
+                  required
+                />
+              </label>
+              <label className="space-y-1 text-[var(--textMuted)]">
+                <span className="font-semibold text-[var(--text)]">Role</span>
+                <select
+                  value={userForm.role}
+                  onChange={(event) => setUserForm((prev) => ({ ...prev, role: event.target.value }))}
+                  className="w-full rounded-xl border border-[var(--border-soft)] bg-[var(--surface)] px-3 py-2 text-[var(--text)] focus:border-[var(--primary)] focus:outline-none"
+                >
+                  {roleOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+            <div className="flex flex-wrap items-center gap-3">
+              <button
+                type="submit"
+                disabled={userSubmitting}
+                className="inline-flex items-center justify-center rounded-full bg-[var(--primary)] px-4 py-2 font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {userSubmitting ? 'Creating…' : 'Create user'}
+              </button>
+              <button
+                type="button"
+                onClick={() => window.open('/api/users', '_blank')}
+                className="inline-flex items-center justify-center rounded-full border border-[var(--border-soft)] px-4 py-2 font-semibold text-[var(--text)] transition hover:border-[var(--primary)]/60 hover:text-[var(--primary)]"
+              >
+                Open directory API
+              </button>
+            </div>
+            {userFormState && (
+              <div
+                className={`rounded-xl px-3 py-2 text-[var(--text)] ${
+                  userFormState.tone === 'success'
+                    ? 'bg-emerald-500/10 text-emerald-600'
+                    : 'bg-rose-500/10 text-rose-600'
+                }`}
+              >
+                {userFormState.message}
+              </div>
+            )}
+          </form>
         </div>
-        <div className="rounded-2xl border border-[var(--border-soft)] bg-[var(--surface)]/80 p-5 space-y-3">
+        <div className="rounded-2xl border border-[var(--border-soft)] bg-[var(--surface)]/80 p-5 space-y-4">
           <div>
             <h3 className="text-sm font-semibold text-[var(--text)]">Course catalogue</h3>
             <p className="text-xs text-[var(--textMuted)]">
@@ -703,12 +873,100 @@ export default function AdminSettings() {
               <p>{overview?.counts.enrollments.toLocaleString?.() ?? '—'}</p>
             </div>
           </div>
-          <Link
-            to="/courses"
-            className="inline-flex items-center justify-center rounded-full border border-[var(--border-soft)] px-4 py-2 text-xs font-semibold text-[var(--text)] transition hover:border-[var(--primary)]/60 hover:text-[var(--primary)]"
-          >
-            Go to course workspace
-          </Link>
+          <form onSubmit={handleCreateCourse} className="space-y-3 text-xs">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="space-y-1 text-[var(--textMuted)]">
+                <span className="font-semibold text-[var(--text)]">Course title</span>
+                <input
+                  type="text"
+                  value={courseForm.title}
+                  onChange={(event) => setCourseForm((prev) => ({ ...prev, title: event.target.value }))}
+                  className="w-full rounded-xl border border-[var(--border-soft)] bg-[var(--surface)] px-3 py-2 text-[var(--text)] focus:border-[var(--primary)] focus:outline-none"
+                  placeholder="Demo learning path"
+                  required
+                />
+              </label>
+              <label className="space-y-1 text-[var(--textMuted)]">
+                <span className="font-semibold text-[var(--text)]">Course code</span>
+                <input
+                  type="text"
+                  value={courseForm.code}
+                  onChange={(event) => setCourseForm((prev) => ({ ...prev, code: event.target.value }))}
+                  className="w-full rounded-xl border border-[var(--border-soft)] bg-[var(--surface)] px-3 py-2 text-[var(--text)] focus:border-[var(--primary)] focus:outline-none"
+                  placeholder="DEMO-101"
+                  required
+                />
+              </label>
+            </div>
+            <label className="space-y-1 text-[var(--textMuted)] block">
+              <span className="font-semibold text-[var(--text)]">Description</span>
+              <textarea
+                value={courseForm.description}
+                onChange={(event) => setCourseForm((prev) => ({ ...prev, description: event.target.value }))}
+                className="w-full rounded-xl border border-[var(--border-soft)] bg-[var(--surface)] px-3 py-2 text-[var(--text)] focus:border-[var(--primary)] focus:outline-none"
+                rows={3}
+                placeholder="Share who the course is for and what it covers."
+              />
+            </label>
+            <div className="grid gap-3 sm:grid-cols-3">
+              <label className="space-y-1 text-[var(--textMuted)] sm:col-span-1">
+                <span className="font-semibold text-[var(--text)]">Visibility</span>
+                <select
+                  value={courseForm.visibility}
+                  onChange={(event) => setCourseForm((prev) => ({ ...prev, visibility: event.target.value }))}
+                  className="w-full rounded-xl border border-[var(--border-soft)] bg-[var(--surface)] px-3 py-2 text-[var(--text)] focus:border-[var(--primary)] focus:outline-none"
+                >
+                  <option value="PRIVATE">Private</option>
+                  <option value="PUBLIC">Public</option>
+                  <option value="INVITE_ONLY">Invite only</option>
+                </select>
+              </label>
+              <label className="space-y-1 text-[var(--textMuted)]">
+                <span className="font-semibold text-[var(--text)]">Start date</span>
+                <input
+                  type="date"
+                  value={courseForm.startDate}
+                  onChange={(event) => setCourseForm((prev) => ({ ...prev, startDate: event.target.value }))}
+                  className="w-full rounded-xl border border-[var(--border-soft)] bg-[var(--surface)] px-3 py-2 text-[var(--text)] focus:border-[var(--primary)] focus:outline-none"
+                />
+              </label>
+              <label className="space-y-1 text-[var(--textMuted)]">
+                <span className="font-semibold text-[var(--text)]">End date</span>
+                <input
+                  type="date"
+                  value={courseForm.endDate}
+                  onChange={(event) => setCourseForm((prev) => ({ ...prev, endDate: event.target.value }))}
+                  className="w-full rounded-xl border border-[var(--border-soft)] bg-[var(--surface)] px-3 py-2 text-[var(--text)] focus:border-[var(--primary)] focus:outline-none"
+                />
+              </label>
+            </div>
+            <div className="flex flex-wrap items-center gap-3">
+              <button
+                type="submit"
+                disabled={courseSubmitting}
+                className="inline-flex items-center justify-center rounded-full bg-[var(--secondary)] px-4 py-2 font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {courseSubmitting ? 'Creating…' : 'Create course'}
+              </button>
+              <Link
+                to="/courses"
+                className="inline-flex items-center justify-center rounded-full border border-[var(--border-soft)] px-4 py-2 font-semibold text-[var(--text)] transition hover:border-[var(--primary)]/60 hover:text-[var(--primary)]"
+              >
+                Go to course workspace
+              </Link>
+            </div>
+            {courseFormState && (
+              <div
+                className={`rounded-xl px-3 py-2 text-[var(--text)] ${
+                  courseFormState.tone === 'success'
+                    ? 'bg-emerald-500/10 text-emerald-600'
+                    : 'bg-rose-500/10 text-rose-600'
+                }`}
+              >
+                {courseFormState.message}
+              </div>
+            )}
+          </form>
         </div>
       </div>
 

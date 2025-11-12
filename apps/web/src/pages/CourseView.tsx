@@ -43,6 +43,16 @@ export default function CourseView() {
   const [loadingMetrics, setLoadingMetrics] = useState(true);
   const [metricsError, setMetricsError] = useState<string | null>(null);
 
+  const assignmentsPercent = useMemo(() => {
+    if (!metrics || !metrics.assignmentsTotal) return 0;
+    return Math.min(100, Math.round((metrics.assignmentsCompleted / metrics.assignmentsTotal) * 100));
+  }, [metrics]);
+
+  const quizzesPercent = useMemo(() => {
+    if (!metrics || !metrics.quizzesTotal) return 0;
+    return Math.min(100, Math.round((metrics.quizzesAttempted / metrics.quizzesTotal) * 100));
+  }, [metrics]);
+
   useEffect(() => {
     if (!id) return;
     let isMounted = true;
@@ -77,14 +87,6 @@ export default function CourseView() {
   }
 
   const progressPercent = Math.max(0, Math.min(100, Math.round(metrics?.progressPercent ?? 0)));
-  const assignmentsPercent = useMemo(() => {
-    if (!metrics || !metrics.assignmentsTotal) return 0;
-    return Math.min(100, Math.round((metrics.assignmentsCompleted / metrics.assignmentsTotal) * 100));
-  }, [metrics]);
-  const quizzesPercent = useMemo(() => {
-    if (!metrics || !metrics.quizzesTotal) return 0;
-    return Math.min(100, Math.round((metrics.quizzesAttempted / metrics.quizzesTotal) * 100));
-  }, [metrics]);
 
   const moduleSummary = metrics
     ? `${metrics.modulesCompleted ?? 0}/${metrics.modulesTotal ?? 0} modules`

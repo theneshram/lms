@@ -5,6 +5,7 @@ import User from '../models/User.js';
 import Group from '../models/Group.js';
 import ActivityLog from '../models/ActivityLog.js';
 import { asyncHandler } from '../utils/error.js';
+import { logActivity } from '../utils/activity.js';
 
 const router = Router();
 
@@ -19,6 +20,36 @@ router.get(
     if (group) filters.groups = group;
     const users = await User.find(filters).populate('groups');
     res.json(users);
+  })
+);
+
+router.post(
+  '/',
+  requireAuth,
+  requireRole('ADMIN'),
+  asyncHandler(async (req, res) => {
+    const { name, email, password, role = 'STUDENT', status = 'ACTIVE' } = req.body ?? {};
+    if (!name || !email || !password) {
+      return res.status(400).json({ message: 'Name, email, and password are required.' });
+    }
+
+    const existing = await User.findOne({ email });
+    if (existing) {
+      return res.status(409).json({ message: 'A user with this email already exists.' });
+    }
+
+    const user = await User.create({ name, email, password, role, status });
+    await logActivity({
+      user: req.user._id,
+      action: 'USER_CREATED',
+      entityType: 'USER',
+      entityId: user._id,
+      metadata: { createdRole: role },
+      req,
+    });
+
+    const safeUser = await User.findById(user._id).select('-password');
+    res.status(201).json(safeUser);
   })
 );
 
