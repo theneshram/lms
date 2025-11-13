@@ -129,7 +129,54 @@ type AdminOverview = {
   };
 };
 
-type DatabaseState = { provider?: string; uri?: string; dbName?: string };
+type DatabaseState = {
+  provider?: string;
+  uri?: string;
+  dbName?: string;
+  lastAppliedAt?: string;
+  lastConnectedAt?: string;
+  lastLatencyMs?: number | null;
+  lastErrorAt?: string;
+  lastErrorMessage?: string | null;
+  lastErrorCode?: string | null;
+};
+
+type DatabaseDiagnostics = {
+  uri?: string;
+  dbName?: string;
+  connected: boolean;
+  status?: 'connected' | 'disconnected';
+  message?: string;
+  readyState?: number;
+  host?: string;
+  port?: number;
+  user?: string;
+  pingMs?: number;
+  pingError?: string;
+  stats?: {
+    collections?: number;
+    objects?: number;
+    storageSizeMb?: number;
+    dataSizeMb?: number;
+    indexSizeMb?: number;
+    avgObjSizeKb?: number | null;
+  };
+  statsError?: string;
+  uptimeSeconds?: number;
+  connections?: { current?: number; available?: number; totalCreated?: number };
+  memory?: { residentMb?: number; virtualMb?: number; mappedMb?: number };
+  operationCounters?: {
+    insert?: number;
+    query?: number;
+    update?: number;
+    delete?: number;
+    getmore?: number;
+    command?: number;
+  };
+  network?: { bytesIn?: number; bytesOut?: number; numRequests?: number };
+  serverStatusError?: string;
+  lastCheckedAt: string;
+};
 
 type Settings = {
   appearance: AppearanceForm;
@@ -150,6 +197,9 @@ export default function AdminSettings() {
   const [emailTest, setEmailTest] = useState('');
   const [emailState, setEmailState] = useState<SaveState>(null);
   const [dbState, setDbState] = useState<SaveState>(null);
+  const [dbDiagnostics, setDbDiagnostics] = useState<DatabaseDiagnostics | null>(null);
+  const [dbStatusLoading, setDbStatusLoading] = useState(false);
+  const [dbStatusError, setDbStatusError] = useState<string | null>(null);
   const [overview, setOverview] = useState<AdminOverview | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [userForm, setUserForm] = useState({ name: '', email: '', password: '', role: 'STUDENT' });
@@ -182,6 +232,33 @@ export default function AdminSettings() {
     []
   );
   const [activeNav, setActiveNav] = useState(navSections[0].id);
+
+  const formatNumber = (value?: number | null) =>
+    typeof value === 'number' && !Number.isNaN(value) ? value.toLocaleString() : '—';
+
+  const formatBytes = (bytes?: number | null) => {
+    if (typeof bytes !== 'number' || Number.isNaN(bytes)) return '—';
+    if (bytes >= 1024 ** 3) return `${(bytes / 1024 ** 3).toFixed(2)} GB`;
+    if (bytes >= 1024 ** 2) return `${(bytes / 1024 ** 2).toFixed(2)} MB`;
+    if (bytes >= 1024) return `${(bytes / 1024).toFixed(2)} KB`;
+    return `${bytes.toFixed(0)} B`;
+  };
+
+  const formatMegabytes = (value?: number | null) => {
+    if (typeof value !== 'number' || Number.isNaN(value)) return '—';
+    if (value >= 1024) return `${(value / 1024).toFixed(2)} GB`;
+    return `${value.toFixed(2)} MB`;
+  };
+
+  const formatDuration = (seconds?: number | null) => {
+    if (typeof seconds !== 'number' || Number.isNaN(seconds) || seconds <= 0) return '—';
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = Math.floor(seconds % 60);
+    if (hours) return `${hours}h ${minutes}m`;
+    if (minutes) return `${minutes}m ${secs}s`;
+    return `${secs}s`;
+  };
 
   const refreshOverview = async () => {
     try {
@@ -227,6 +304,28 @@ export default function AdminSettings() {
     return () => {
       cancelled = true;
     };
+  }, []);
+
+  const fetchDatabaseStatus = async () => {
+    setDbStatusLoading(true);
+    setDbStatusError(null);
+    try {
+      const response = await api.get<DatabaseDiagnostics>('/admin/settings/database/status');
+      setDbDiagnostics(response.data);
+      if (!response.data?.connected && response.data?.message) {
+        setDbStatusError(response.data.message);
+      }
+    } catch (error: any) {
+      const message = error?.response?.data?.message || 'Unable to retrieve database status. Check network access rules.';
+      setDbStatusError(message);
+      setDbDiagnostics(null);
+    } finally {
+      setDbStatusLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchDatabaseStatus();
   }, []);
 
   useEffect(() => {
@@ -553,9 +652,21 @@ export default function AdminSettings() {
         uri: database?.uri,
         dbName: database?.dbName,
       });
-      setDbState({ message: `Database reconfigured to ${response.data.active?.uri}`, tone: 'success' });
-    } catch (error) {
-      setDbState({ message: 'Unable to connect to the provided database.', tone: 'error' });
+      const diagnostics: DatabaseDiagnostics | undefined = response.data?.active;
+      setDbDiagnostics(diagnostics || null);
+      const latency = diagnostics?.pingMs ? ` (latency ${diagnostics.pingMs} ms)` : '';
+      setDbState({
+        message: `Database reconfigured successfully${latency}.`,
+        tone: diagnostics?.connected === false ? 'error' : 'success',
+      });
+      await fetchDatabaseStatus();
+    } catch (error: any) {
+      const message =
+        error?.response?.data?.message ||
+        error?.message ||
+        'Unable to connect to the provided database. Verify credentials and network access.';
+      setDbState({ message, tone: 'error' });
+      setDbStatusError(message);
     }
   }
 
@@ -1632,60 +1743,244 @@ export default function AdminSettings() {
     </section>
   );
 
-  const renderDatabaseSection = () => (
-    <section id="database" className="card space-y-6 p-8">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h2 className="text-xl font-semibold text-[var(--text)]">Database configuration</h2>
-          <p className="text-sm text-[var(--textMuted)]">Switch between local MongoDB deployments and managed MongoDB Atlas clusters, then migrate schemas instantly.</p>
+  const renderDatabaseSection = () => {
+    const status = dbDiagnostics;
+    const connectionsCurrent = status?.connections?.current ?? 0;
+    const connectionsAvailable = status?.connections?.available ?? 0;
+    const totalConnections = connectionsCurrent + connectionsAvailable;
+    const connectionUsagePercent = totalConnections
+      ? Math.min(100, Math.round((connectionsCurrent / totalConnections) * 100))
+      : 0;
+    const networkBytesIn = status?.network?.bytesIn ?? 0;
+    const networkBytesOut = status?.network?.bytesOut ?? 0;
+    const networkTotal = networkBytesIn + networkBytesOut;
+    const networkInPercent = networkTotal ? Math.min(100, Math.round((networkBytesIn / networkTotal) * 100)) : 0;
+    const lowerCaseStatus = (dbStatusError || dbState?.message || '').toLowerCase();
+    const atlasHint = lowerCaseStatus.includes('access list') || lowerCaseStatus.includes('network access') || lowerCaseStatus.includes('ip');
+
+    return (
+      <section id="database" className="card space-y-6 p-8">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <h2 className="text-xl font-semibold text-[var(--text)]">Database configuration</h2>
+            <p className="text-sm text-[var(--textMuted)]">
+              Switch between local MongoDB deployments and managed MongoDB Atlas clusters, then migrate schemas instantly.
+            </p>
+          </div>
         </div>
-      </div>
 
-      {dbState && (
-        <div
-          className={`rounded-lg px-4 py-3 text-sm ${
-            dbState.tone === 'success' ? 'bg-emerald-500/10 text-emerald-600' : 'bg-rose-500/10 text-rose-600'
-          }`}
-        >
-          {dbState.message}
+        {dbState && (
+          <div
+            className={`rounded-lg px-4 py-3 text-sm ${
+              dbState.tone === 'success' ? 'bg-emerald-500/10 text-emerald-600' : 'bg-rose-500/10 text-rose-600'
+            }`}
+          >
+            {dbState.message}
+          </div>
+        )}
+
+        <div className="grid gap-4 md:grid-cols-3">
+          <select
+            value={database.provider || 'LOCAL'}
+            onChange={(e) => updateDatabase('provider', e.target.value)}
+            className="rounded-xl border border-[var(--border-soft)] bg-[var(--surface)]/80 px-4 py-2 text-sm"
+          >
+            <option value="LOCAL">Local MongoDB</option>
+            <option value="ATLAS">MongoDB Atlas</option>
+            <option value="CUSTOM">Custom connection</option>
+          </select>
+          <input
+            type="text"
+            value={database.uri || ''}
+            onChange={(e) => updateDatabase('uri', e.target.value)}
+            placeholder="mongodb+srv://user:pass@cluster.mongodb.net"
+            className="rounded-xl border border-[var(--border-soft)] bg-[var(--surface)]/80 px-4 py-2 text-sm"
+          />
+          <input
+            type="text"
+            value={database.dbName || ''}
+            onChange={(e) => updateDatabase('dbName', e.target.value)}
+            placeholder="Database name"
+            className="rounded-xl border border-[var(--border-soft)] bg-[var(--surface)]/80 px-4 py-2 text-sm"
+          />
         </div>
-      )}
 
-      <div className="grid gap-4 md:grid-cols-3">
-        <select
-          value={database.provider || 'LOCAL'}
-          onChange={(e) => updateDatabase('provider', e.target.value)}
-          className="rounded-xl border border-[var(--border-soft)] bg-[var(--surface)]/80 px-4 py-2 text-sm"
+        <button
+          type="button"
+          onClick={handleApplyDatabase}
+          className="rounded-full bg-[var(--primary)] px-5 py-2 text-sm font-semibold text-white shadow-lg shadow-[var(--primary)]/30"
         >
-          <option value="LOCAL">Local MongoDB</option>
-          <option value="ATLAS">MongoDB Atlas</option>
-          <option value="CUSTOM">Custom connection</option>
-        </select>
-        <input
-          type="text"
-          value={database.uri || ''}
-          onChange={(e) => updateDatabase('uri', e.target.value)}
-          placeholder="mongodb+srv://user:pass@cluster.mongodb.net"
-          className="rounded-xl border border-[var(--border-soft)] bg-[var(--surface)]/80 px-4 py-2 text-sm"
-        />
-        <input
-          type="text"
-          value={database.dbName || ''}
-          onChange={(e) => updateDatabase('dbName', e.target.value)}
-          placeholder="Database name"
-          className="rounded-xl border border-[var(--border-soft)] bg-[var(--surface)]/80 px-4 py-2 text-sm"
-        />
-      </div>
+          Apply & run schema sync
+        </button>
 
-      <button
-        type="button"
-        onClick={handleApplyDatabase}
-        className="rounded-full bg-[var(--primary)] px-5 py-2 text-sm font-semibold text-white shadow-lg shadow-[var(--primary)]/30"
-      >
-        Apply & run schema sync
-      </button>
-    </section>
-  );
+        <div className="rounded-2xl border border-[var(--border-soft)] bg-[var(--surface)]/80 p-6 shadow-sm">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <h3 className="text-sm font-semibold text-[var(--text)]">Connection status</h3>
+              <p className="text-xs text-[var(--textMuted)]">
+                {status?.lastCheckedAt
+                  ? `Last checked ${new Date(status.lastCheckedAt).toLocaleString()}`
+                  : 'Status updates each time you run a check.'}
+              </p>
+            </div>
+            <div className="flex items-center gap-3">
+              <span
+                className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ${
+                  status?.connected
+                    ? 'bg-emerald-500/10 text-emerald-600'
+                    : 'bg-amber-500/10 text-amber-600'
+                }`}
+              >
+                <span
+                  className={`h-2 w-2 rounded-full ${status?.connected ? 'bg-emerald-500' : 'bg-amber-500'}`}
+                />
+                {dbStatusLoading ? 'Checking…' : status?.connected ? 'Connected' : 'Not connected'}
+              </span>
+              <button
+                type="button"
+                onClick={fetchDatabaseStatus}
+                disabled={dbStatusLoading}
+                className="rounded-full border border-[var(--border-soft)] px-4 py-1 text-xs font-semibold text-[var(--text)] transition hover:border-[var(--primary)] hover:text-[var(--primary)] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {dbStatusLoading ? 'Checking…' : 'Refresh status'}
+              </button>
+            </div>
+          </div>
+
+          {dbStatusError && (
+            <div className="mt-4 rounded-lg border border-amber-200 bg-amber-500/10 px-4 py-3 text-xs text-amber-700">
+              <p>{dbStatusError}</p>
+              {atlasHint && (
+                <p className="mt-2 font-medium">
+                  Using MongoDB Atlas? Ensure the server IP (or 0.0.0.0/0 for testing) is whitelisted in the project network access
+                  settings.
+                </p>
+              )}
+            </div>
+          )}
+
+          {dbStatusLoading && (
+            <p className="mt-4 text-sm text-[var(--textMuted)]">Checking database connectivity…</p>
+          )}
+
+          {!dbStatusLoading && !status && !dbStatusError && (
+            <p className="mt-4 text-sm text-[var(--textMuted)]">Database diagnostics unavailable. Run a status check to view metrics.</p>
+          )}
+
+          {!dbStatusLoading && status && (
+            <div className="mt-5 space-y-5 text-sm">
+              {status.serverStatusError && (
+                <div className="rounded-lg border border-amber-200 bg-amber-500/10 px-4 py-3 text-xs text-amber-700">
+                  MongoDB did not allow server metrics to be queried: {status.serverStatusError}
+                </div>
+              )}
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                <div className="rounded-xl border border-[var(--border-soft)] bg-[var(--surface)]/70 p-4">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-[var(--textMuted)]">Latency</p>
+                  <p className="mt-2 text-2xl font-semibold text-[var(--text)]">
+                    {typeof status.pingMs === 'number' ? `${status.pingMs} ms` : '—'}
+                  </p>
+                  <p className="mt-1 text-xs text-[var(--textMuted)]">Ready state {status.readyState ?? '—'}</p>
+                </div>
+                <div className="rounded-xl border border-[var(--border-soft)] bg-[var(--surface)]/70 p-4">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-[var(--textMuted)]">Storage footprint</p>
+                  <p className="mt-2 text-lg font-semibold text-[var(--text)]">
+                    {formatMegabytes(status.stats?.dataSizeMb ?? null)} data
+                  </p>
+                  <p className="text-xs text-[var(--textMuted)]">Indexes {formatMegabytes(status.stats?.indexSizeMb ?? null)}</p>
+                </div>
+                <div className="rounded-xl border border-[var(--border-soft)] bg-[var(--surface)]/70 p-4">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-[var(--textMuted)]">Collections</p>
+                  <p className="mt-2 text-2xl font-semibold text-[var(--text)]">{formatNumber(status.stats?.collections)}</p>
+                  <p className="text-xs text-[var(--textMuted)]">Objects {formatNumber(status.stats?.objects)}</p>
+                </div>
+                <div className="rounded-xl border border-[var(--border-soft)] bg-[var(--surface)]/70 p-4">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-[var(--textMuted)]">Uptime</p>
+                  <p className="mt-2 text-2xl font-semibold text-[var(--text)]">{formatDuration(status.uptimeSeconds ?? null)}</p>
+                  <p className="text-xs text-[var(--textMuted)]">Host {status.host || '—'}</p>
+                </div>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="rounded-xl border border-[var(--border-soft)] bg-[var(--surface)]/70 p-4">
+                  <div className="flex items-center justify-between text-xs text-[var(--textMuted)]">
+                    <p className="font-semibold uppercase tracking-wide text-[var(--textMuted)]">Connections</p>
+                    <span>{formatNumber(connectionsCurrent)} / {formatNumber(totalConnections)}</span>
+                  </div>
+                  <div className="mt-3 h-2 overflow-hidden rounded-full bg-[var(--border-soft)]">
+                    <div
+                      className="h-2 bg-gradient-to-r from-[var(--primary)] via-emerald-500 to-emerald-400"
+                      style={{ width: `${connectionUsagePercent}%` }}
+                    />
+                  </div>
+                  <p className="mt-2 text-xs text-[var(--textMuted)]">{formatNumber(connectionsAvailable)} connections available</p>
+                </div>
+                <div className="rounded-xl border border-[var(--border-soft)] bg-[var(--surface)]/70 p-4">
+                  <div className="flex items-center justify-between text-xs text-[var(--textMuted)]">
+                    <p className="font-semibold uppercase tracking-wide text-[var(--textMuted)]">Network throughput</p>
+                    <span>{formatNumber(status.network?.numRequests)} requests</span>
+                  </div>
+                  <p className="mt-3 text-sm text-[var(--text)]">
+                    In {formatBytes(networkBytesIn)} · Out {formatBytes(networkBytesOut)}
+                  </p>
+                  <div className="mt-3 h-2 overflow-hidden rounded-full bg-[var(--border-soft)]">
+                    <div
+                      className="h-2 bg-gradient-to-r from-sky-500 via-blue-500 to-indigo-500"
+                      style={{ width: `${networkInPercent}%` }}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-[var(--border-soft)] bg-[var(--surface)]/70 p-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-[var(--textMuted)]">Operation counters</p>
+                <div className="mt-3 grid gap-3 sm:grid-cols-3">
+                  {Object.entries(status.operationCounters || {}).map(([key, value]) => (
+                    <div key={key} className="space-y-1">
+                      <p className="text-xs uppercase tracking-wide text-[var(--textMuted)]">{key}</p>
+                      <p className="text-sm font-semibold text-[var(--text)]">{formatNumber(value as number)}</p>
+                      <div className="h-1.5 overflow-hidden rounded-full bg-[var(--border-soft)]">
+                        <div
+                          className="h-full bg-gradient-to-r from-[var(--primary)]/60 via-[var(--primary)] to-[var(--primary)]/80"
+                          style={{ width: `${Math.min(100, Number(value) ? Math.log10(Number(value) + 1) * 20 : 5)}%` }}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="rounded-xl border border-[var(--border-soft)] bg-[var(--surface)]/70 p-4 text-xs text-[var(--textMuted)]">
+                  <p className="font-semibold text-[var(--text)]">Applied configuration</p>
+                  <p className="mt-2 break-all text-[var(--text)]">{status.uri || '—'}</p>
+                  <p className="mt-1">Database: {status.dbName || '—'}</p>
+                  {database.lastConnectedAt && (
+                    <p className="mt-1">Last successful sync: {new Date(database.lastConnectedAt).toLocaleString()}</p>
+                  )}
+                  {typeof database.lastLatencyMs === 'number' && (
+                    <p className="mt-1">Last measured latency: {database.lastLatencyMs} ms</p>
+                  )}
+                </div>
+                <div className="rounded-xl border border-[var(--border-soft)] bg-[var(--surface)]/70 p-4 text-xs text-[var(--textMuted)]">
+                  <p className="font-semibold text-[var(--text)]">Recent issues</p>
+                  {database.lastErrorMessage ? (
+                    <>
+                      <p className="mt-2 text-[var(--text)]">{database.lastErrorMessage}</p>
+                      {database.lastErrorAt && <p className="mt-1">Occurred: {new Date(database.lastErrorAt).toLocaleString()}</p>}
+                      {database.lastErrorCode && <p className="mt-1">Error code: {database.lastErrorCode}</p>}
+                    </>
+                  ) : (
+                    <p className="mt-2">No recent connection issues recorded.</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </section>
+    );
+  };
 
   const renderMonitoringSection = () => (
     <section id="monitoring" className="card space-y-6 p-8">

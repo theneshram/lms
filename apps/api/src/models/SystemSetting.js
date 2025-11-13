@@ -96,6 +96,11 @@ const DatabaseSchema = new mongoose.Schema(
     dbName: { type: String, default: 'lms' },
     lastAppliedAt: Date,
     appliedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    lastConnectedAt: Date,
+    lastLatencyMs: Number,
+    lastErrorAt: Date,
+    lastErrorMessage: String,
+    lastErrorCode: String,
   },
   { _id: false }
 );
