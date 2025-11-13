@@ -197,9 +197,7 @@ export default function AdminSettings() {
   const [emailTest, setEmailTest] = useState('');
   const [emailState, setEmailState] = useState<SaveState>(null);
   const [dbState, setDbState] = useState<SaveState>(null);
-  const [dbDiagnostics, setDbDiagnostics] = useState<DatabaseDiagnostics | null>(null);
-  const [dbStatusLoading, setDbStatusLoading] = useState(false);
-  const [dbStatusError, setDbStatusError] = useState<string | null>(null);
+  const [activeDatabase, setActiveDatabase] = useState<DatabaseState | null>(null);
   const [overview, setOverview] = useState<AdminOverview | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [userForm, setUserForm] = useState({ name: '', email: '', password: '', role: 'STUDENT' });
@@ -326,6 +324,42 @@ export default function AdminSettings() {
 
   useEffect(() => {
     fetchDatabaseStatus();
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadDatabaseStatus() {
+      try {
+        const response = await api.get<{ message?: string; stored?: DatabaseState; active?: DatabaseState }>(
+          '/admin/settings/database'
+        );
+        if (cancelled) return;
+        setActiveDatabase(response.data.active ?? null);
+        if (response.data.stored) {
+          setSettings((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  database: { ...(prev.database ?? {}), ...response.data.stored },
+                }
+              : prev
+          );
+        }
+        if (response.data.message) {
+          setDbState({ message: response.data.message, tone: 'success' });
+        }
+      } catch (error: any) {
+        if (cancelled) return;
+        const message =
+          error?.response?.data?.message ??
+          'Unable to load database status. Ensure MongoDB is running locally and accessible to the API server.';
+        setDbState({ message, tone: 'error' });
+      }
+    }
+    loadDatabaseStatus();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -504,20 +538,6 @@ export default function AdminSettings() {
     );
   }
 
-  function updateDatabase(field: keyof DatabaseState, value: string) {
-    setSettings((prev) =>
-      prev
-        ? {
-            ...prev,
-            database: {
-              ...prev.database,
-              [field]: value,
-            },
-          }
-        : prev
-    );
-  }
-
   function mergeStorage(partial: Partial<StorageForm>) {
     setSettings((prev) => {
       if (!prev) return prev;
@@ -641,32 +661,31 @@ export default function AdminSettings() {
     }
   }
 
-  async function handleApplyDatabase() {
-    if (!database?.uri) {
-      setDbState({ message: 'Provide a MongoDB connection string before applying.', tone: 'error' });
-      return;
-    }
+  async function handleRefreshDatabase() {
     try {
       const response = await api.post('/admin/settings/database/apply', {
-        provider: database?.provider,
         uri: database?.uri,
         dbName: database?.dbName,
       });
-      const diagnostics: DatabaseDiagnostics | undefined = response.data?.active;
-      setDbDiagnostics(diagnostics || null);
-      const latency = diagnostics?.pingMs ? ` (latency ${diagnostics.pingMs} ms)` : '';
-      setDbState({
-        message: `Database reconfigured successfully${latency}.`,
-        tone: diagnostics?.connected === false ? 'error' : 'success',
-      });
-      await fetchDatabaseStatus();
+      setActiveDatabase(response.data.active ?? null);
+      if (response.data.stored) {
+        setSettings((prev) =>
+          prev
+            ? {
+                ...prev,
+                database: { ...(prev.database ?? {}), ...response.data.stored },
+              }
+            : prev
+        );
+      }
+      const message =
+        response.data.message ?? 'Local MongoDB connection verified successfully.';
+      setDbState({ message, tone: 'success' });
     } catch (error: any) {
       const message =
-        error?.response?.data?.message ||
-        error?.message ||
-        'Unable to connect to the provided database. Verify credentials and network access.';
+        error?.response?.data?.message ??
+        'Unable to verify the local MongoDB connection. Confirm the database service is running and reachable.';
       setDbState({ message, tone: 'error' });
-      setDbStatusError(message);
     }
   }
 
@@ -1743,31 +1762,25 @@ export default function AdminSettings() {
     </section>
   );
 
-  const renderDatabaseSection = () => {
-    const status = dbDiagnostics;
-    const connectionsCurrent = status?.connections?.current ?? 0;
-    const connectionsAvailable = status?.connections?.available ?? 0;
-    const totalConnections = connectionsCurrent + connectionsAvailable;
-    const connectionUsagePercent = totalConnections
-      ? Math.min(100, Math.round((connectionsCurrent / totalConnections) * 100))
-      : 0;
-    const networkBytesIn = status?.network?.bytesIn ?? 0;
-    const networkBytesOut = status?.network?.bytesOut ?? 0;
-    const networkTotal = networkBytesIn + networkBytesOut;
-    const networkInPercent = networkTotal ? Math.min(100, Math.round((networkBytesIn / networkTotal) * 100)) : 0;
-    const lowerCaseStatus = (dbStatusError || dbState?.message || '').toLowerCase();
-    const atlasHint = lowerCaseStatus.includes('access list') || lowerCaseStatus.includes('network access') || lowerCaseStatus.includes('ip');
-
-    return (
-      <section id="database" className="card space-y-6 p-8">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <h2 className="text-xl font-semibold text-[var(--text)]">Database configuration</h2>
-            <p className="text-sm text-[var(--textMuted)]">
-              Switch between local MongoDB deployments and managed MongoDB Atlas clusters, then migrate schemas instantly.
-            </p>
-          </div>
+  const renderDatabaseSection = () => (
+    <section id="database" className="card space-y-6 p-8">
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h2 className="text-xl font-semibold text-[var(--text)]">Database configuration</h2>
+          <p className="text-sm text-[var(--textMuted)]">
+            The LMS API connects to a local MongoDB instance. Update the <code className="rounded bg-[var(--surface)] px-1 py-0.5 text-xs">MONGO_URI</code>
+            {' '}and <code className="rounded bg-[var(--surface)] px-1 py-0.5 text-xs">MONGO_DB</code> environment variables if you need to target a different
+            database and restart the API service afterwards.
+          </p>
         </div>
+        <button
+          type="button"
+          onClick={handleRefreshDatabase}
+          className="rounded-full bg-[var(--primary)] px-5 py-2 text-sm font-semibold text-white shadow-lg shadow-[var(--primary)]/30"
+        >
+          Check local database status
+        </button>
+      </div>
 
         {dbState && (
           <div
@@ -1805,182 +1818,60 @@ export default function AdminSettings() {
           />
         </div>
 
-        <button
-          type="button"
-          onClick={handleApplyDatabase}
-          className="rounded-full bg-[var(--primary)] px-5 py-2 text-sm font-semibold text-white shadow-lg shadow-[var(--primary)]/30"
-        >
-          Apply & run schema sync
-        </button>
-
-        <div className="rounded-2xl border border-[var(--border-soft)] bg-[var(--surface)]/80 p-6 shadow-sm">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div>
-              <h3 className="text-sm font-semibold text-[var(--text)]">Connection status</h3>
-              <p className="text-xs text-[var(--textMuted)]">
-                {status?.lastCheckedAt
-                  ? `Last checked ${new Date(status.lastCheckedAt).toLocaleString()}`
-                  : 'Status updates each time you run a check.'}
-              </p>
-            </div>
-            <div className="flex items-center gap-3">
-              <span
-                className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ${
-                  status?.connected
-                    ? 'bg-emerald-500/10 text-emerald-600'
-                    : 'bg-amber-500/10 text-amber-600'
-                }`}
-              >
-                <span
-                  className={`h-2 w-2 rounded-full ${status?.connected ? 'bg-emerald-500' : 'bg-amber-500'}`}
-                />
-                {dbStatusLoading ? 'Checking…' : status?.connected ? 'Connected' : 'Not connected'}
-              </span>
-              <button
-                type="button"
-                onClick={fetchDatabaseStatus}
-                disabled={dbStatusLoading}
-                className="rounded-full border border-[var(--border-soft)] px-4 py-1 text-xs font-semibold text-[var(--text)] transition hover:border-[var(--primary)] hover:text-[var(--primary)] disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {dbStatusLoading ? 'Checking…' : 'Refresh status'}
-              </button>
-            </div>
-          </div>
-
-          {dbStatusError && (
-            <div className="mt-4 rounded-lg border border-amber-200 bg-amber-500/10 px-4 py-3 text-xs text-amber-700">
-              <p>{dbStatusError}</p>
-              {atlasHint && (
-                <p className="mt-2 font-medium">
-                  Using MongoDB Atlas? Ensure the server IP (or 0.0.0.0/0 for testing) is whitelisted in the project network access
-                  settings.
-                </p>
-              )}
-            </div>
-          )}
-
-          {dbStatusLoading && (
-            <p className="mt-4 text-sm text-[var(--textMuted)]">Checking database connectivity…</p>
-          )}
-
-          {!dbStatusLoading && !status && !dbStatusError && (
-            <p className="mt-4 text-sm text-[var(--textMuted)]">Database diagnostics unavailable. Run a status check to view metrics.</p>
-          )}
-
-          {!dbStatusLoading && status && (
-            <div className="mt-5 space-y-5 text-sm">
-              {status.serverStatusError && (
-                <div className="rounded-lg border border-amber-200 bg-amber-500/10 px-4 py-3 text-xs text-amber-700">
-                  MongoDB did not allow server metrics to be queried: {status.serverStatusError}
-                </div>
-              )}
-              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                <div className="rounded-xl border border-[var(--border-soft)] bg-[var(--surface)]/70 p-4">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-[var(--textMuted)]">Latency</p>
-                  <p className="mt-2 text-2xl font-semibold text-[var(--text)]">
-                    {typeof status.pingMs === 'number' ? `${status.pingMs} ms` : '—'}
-                  </p>
-                  <p className="mt-1 text-xs text-[var(--textMuted)]">Ready state {status.readyState ?? '—'}</p>
-                </div>
-                <div className="rounded-xl border border-[var(--border-soft)] bg-[var(--surface)]/70 p-4">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-[var(--textMuted)]">Storage footprint</p>
-                  <p className="mt-2 text-lg font-semibold text-[var(--text)]">
-                    {formatMegabytes(status.stats?.dataSizeMb ?? null)} data
-                  </p>
-                  <p className="text-xs text-[var(--textMuted)]">Indexes {formatMegabytes(status.stats?.indexSizeMb ?? null)}</p>
-                </div>
-                <div className="rounded-xl border border-[var(--border-soft)] bg-[var(--surface)]/70 p-4">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-[var(--textMuted)]">Collections</p>
-                  <p className="mt-2 text-2xl font-semibold text-[var(--text)]">{formatNumber(status.stats?.collections)}</p>
-                  <p className="text-xs text-[var(--textMuted)]">Objects {formatNumber(status.stats?.objects)}</p>
-                </div>
-                <div className="rounded-xl border border-[var(--border-soft)] bg-[var(--surface)]/70 p-4">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-[var(--textMuted)]">Uptime</p>
-                  <p className="mt-2 text-2xl font-semibold text-[var(--text)]">{formatDuration(status.uptimeSeconds ?? null)}</p>
-                  <p className="text-xs text-[var(--textMuted)]">Host {status.host || '—'}</p>
-                </div>
-              </div>
-
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="rounded-xl border border-[var(--border-soft)] bg-[var(--surface)]/70 p-4">
-                  <div className="flex items-center justify-between text-xs text-[var(--textMuted)]">
-                    <p className="font-semibold uppercase tracking-wide text-[var(--textMuted)]">Connections</p>
-                    <span>{formatNumber(connectionsCurrent)} / {formatNumber(totalConnections)}</span>
-                  </div>
-                  <div className="mt-3 h-2 overflow-hidden rounded-full bg-[var(--border-soft)]">
-                    <div
-                      className="h-2 bg-gradient-to-r from-[var(--primary)] via-emerald-500 to-emerald-400"
-                      style={{ width: `${connectionUsagePercent}%` }}
-                    />
-                  </div>
-                  <p className="mt-2 text-xs text-[var(--textMuted)]">{formatNumber(connectionsAvailable)} connections available</p>
-                </div>
-                <div className="rounded-xl border border-[var(--border-soft)] bg-[var(--surface)]/70 p-4">
-                  <div className="flex items-center justify-between text-xs text-[var(--textMuted)]">
-                    <p className="font-semibold uppercase tracking-wide text-[var(--textMuted)]">Network throughput</p>
-                    <span>{formatNumber(status.network?.numRequests)} requests</span>
-                  </div>
-                  <p className="mt-3 text-sm text-[var(--text)]">
-                    In {formatBytes(networkBytesIn)} · Out {formatBytes(networkBytesOut)}
-                  </p>
-                  <div className="mt-3 h-2 overflow-hidden rounded-full bg-[var(--border-soft)]">
-                    <div
-                      className="h-2 bg-gradient-to-r from-sky-500 via-blue-500 to-indigo-500"
-                      style={{ width: `${networkInPercent}%` }}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="rounded-xl border border-[var(--border-soft)] bg-[var(--surface)]/70 p-4">
-                <p className="text-xs font-semibold uppercase tracking-wide text-[var(--textMuted)]">Operation counters</p>
-                <div className="mt-3 grid gap-3 sm:grid-cols-3">
-                  {Object.entries(status.operationCounters || {}).map(([key, value]) => (
-                    <div key={key} className="space-y-1">
-                      <p className="text-xs uppercase tracking-wide text-[var(--textMuted)]">{key}</p>
-                      <p className="text-sm font-semibold text-[var(--text)]">{formatNumber(value as number)}</p>
-                      <div className="h-1.5 overflow-hidden rounded-full bg-[var(--border-soft)]">
-                        <div
-                          className="h-full bg-gradient-to-r from-[var(--primary)]/60 via-[var(--primary)] to-[var(--primary)]/80"
-                          style={{ width: `${Math.min(100, Number(value) ? Math.log10(Number(value) + 1) * 20 : 5)}%` }}
-                        />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="rounded-xl border border-[var(--border-soft)] bg-[var(--surface)]/70 p-4 text-xs text-[var(--textMuted)]">
-                  <p className="font-semibold text-[var(--text)]">Applied configuration</p>
-                  <p className="mt-2 break-all text-[var(--text)]">{status.uri || '—'}</p>
-                  <p className="mt-1">Database: {status.dbName || '—'}</p>
-                  {database.lastConnectedAt && (
-                    <p className="mt-1">Last successful sync: {new Date(database.lastConnectedAt).toLocaleString()}</p>
-                  )}
-                  {typeof database.lastLatencyMs === 'number' && (
-                    <p className="mt-1">Last measured latency: {database.lastLatencyMs} ms</p>
-                  )}
-                </div>
-                <div className="rounded-xl border border-[var(--border-soft)] bg-[var(--surface)]/70 p-4 text-xs text-[var(--textMuted)]">
-                  <p className="font-semibold text-[var(--text)]">Recent issues</p>
-                  {database.lastErrorMessage ? (
-                    <>
-                      <p className="mt-2 text-[var(--text)]">{database.lastErrorMessage}</p>
-                      {database.lastErrorAt && <p className="mt-1">Occurred: {new Date(database.lastErrorAt).toLocaleString()}</p>}
-                      {database.lastErrorCode && <p className="mt-1">Error code: {database.lastErrorCode}</p>}
-                    </>
-                  ) : (
-                    <p className="mt-2">No recent connection issues recorded.</p>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
+      <div className="grid gap-4 md:grid-cols-2">
+        <div className="rounded-2xl border border-[var(--border-soft)] bg-[var(--surface)]/80 p-5 text-sm">
+          <h3 className="text-sm font-semibold text-[var(--text)]">Connection string</h3>
+          <p className="mt-1 text-xs text-[var(--textMuted)]">Defined via the API server environment.</p>
+          <code className="mt-3 block break-all rounded-xl bg-[var(--surface)]/70 px-3 py-2 text-xs text-[var(--text)]">
+            {activeDatabase?.uri || database.uri || 'mongodb://127.0.0.1:27017'}
+          </code>
         </div>
-      </section>
-    );
-  };
+        <div className="rounded-2xl border border-[var(--border-soft)] bg-[var(--surface)]/80 p-5 text-sm space-y-3">
+          <div>
+            <h3 className="text-sm font-semibold text-[var(--text)]">Database name</h3>
+            <p className="mt-1 text-xs text-[var(--textMuted)]">Configured with the <code className="rounded bg-[var(--surface)] px-1 py-0.5 text-xs">MONGO_DB</code> variable.</p>
+            <p className="mt-2 text-sm font-mono text-[var(--text)]">
+              {activeDatabase?.dbName || database.dbName || 'lms'}
+            </p>
+          </div>
+          <div>
+            <h3 className="text-sm font-semibold text-[var(--text)]">Provider</h3>
+            <p className="mt-1 text-xs text-[var(--textMuted)]">Dynamic switching is disabled to keep this deployment on the bundled database.</p>
+            <p className="mt-2 text-sm font-medium text-[var(--text)]">Local MongoDB</p>
+          </div>
+        </div>
+      </div>
+
+      {overview?.database && (
+        <div className="rounded-2xl border border-[var(--border-soft)] bg-[var(--surface)]/80 p-5 text-sm">
+          <h3 className="text-sm font-semibold text-[var(--text)]">Current database footprint</h3>
+          <dl className="mt-3 grid gap-2 text-xs text-[var(--textMuted)] sm:grid-cols-2 lg:grid-cols-4">
+            <div>
+              <dt>Collections</dt>
+              <dd className="font-medium text-[var(--text)]">{overview.database.collections ?? 0}</dd>
+            </div>
+            <div>
+              <dt>Documents</dt>
+              <dd className="font-medium text-[var(--text)]">{overview.database.objects ?? 0}</dd>
+            </div>
+            <div>
+              <dt>Data size (MB)</dt>
+              <dd className="font-medium text-[var(--text)]">{overview.database.dataSizeMb ?? 0}</dd>
+            </div>
+            <div>
+              <dt>Index size (MB)</dt>
+              <dd className="font-medium text-[var(--text)]">{overview.database.indexSizeMb ?? 0}</dd>
+            </div>
+          </dl>
+        </div>
+      )}
+
+      <p className="text-xs text-[var(--textMuted)]">
+        To move to a different MongoDB deployment later, stop the API container, update the environment variables, ensure the new
+        host allows local connections, and restart the stack.
+      </p>
+    </section>
+  );
 
   const renderMonitoringSection = () => (
     <section id="monitoring" className="card space-y-6 p-8">

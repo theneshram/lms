@@ -11,20 +11,25 @@ export function getCurrentDatabaseConfig() {
   return { ...currentConfig };
 }
 
-export function normalizeMongoError(error) {
-  if (!error) return error;
-  const normalized = new Error(error.message || 'MongoDB connection failed');
-  normalized.code = error.code || error.codeName;
-  normalized.name = error.name || 'MongoError';
-  normalized.stack = error.stack;
-  if (error.reason?.message) {
-    normalized.message = error.reason.message;
+export async function reconnectDatabase({ uri, dbName } = {}) {
+  const requestedUri = uri ?? currentConfig.uri;
+  const requestedDbName = dbName ?? currentConfig.dbName;
+
+  if (requestedUri !== currentConfig.uri || requestedDbName !== currentConfig.dbName) {
+    const error = new Error(
+      'Dynamic database switching is disabled. Update the environment variables to change the MongoDB connection.'
+    );
+    error.code = 'DB_SWITCH_DISABLED';
+    throw error;
   }
-  if (normalized.message?.toLowerCase().includes('ip address') || normalized.message?.toLowerCase().includes('whitelist')) {
-    normalized.userMessage =
-      'Connection blocked by MongoDB Atlas network access rules. Ensure the server IP is added to the project\'s access list.';
+
+  if (mongoose.connection.readyState !== 1) {
+    await mongoose.connect(currentConfig.uri, { dbName: currentConfig.dbName });
+    await syncAllIndexes();
+    console.log('[DB] ensured local MongoDB connection is active');
   }
-  return normalized;
+
+  return getCurrentDatabaseConfig();
 }
 
 export async function syncAllIndexes() {

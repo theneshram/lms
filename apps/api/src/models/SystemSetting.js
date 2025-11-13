@@ -493,6 +493,13 @@ SystemSettingSchema.statics.getSingleton = async function getSingleton() {
       existing.storage = {};
       await existing.save();
     }
+    if (!existing.database?.provider) {
+      existing.database = {
+        ...(existing.database?.toObject?.() ?? existing.database ?? {}),
+        provider: 'LOCAL',
+      };
+      await existing.save();
+    }
     if (!existing.demoCourse) {
       existing.demoCourse = {};
       await existing.save();
