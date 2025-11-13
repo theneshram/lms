@@ -150,6 +150,7 @@ export default function AdminSettings() {
   const [emailTest, setEmailTest] = useState('');
   const [emailState, setEmailState] = useState<SaveState>(null);
   const [dbState, setDbState] = useState<SaveState>(null);
+  const [activeDatabase, setActiveDatabase] = useState<DatabaseState | null>(null);
   const [overview, setOverview] = useState<AdminOverview | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [userForm, setUserForm] = useState({ name: '', email: '', password: '', role: 'STUDENT' });
@@ -224,6 +225,42 @@ export default function AdminSettings() {
       }
     }
     load();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadDatabaseStatus() {
+      try {
+        const response = await api.get<{ message?: string; stored?: DatabaseState; active?: DatabaseState }>(
+          '/admin/settings/database'
+        );
+        if (cancelled) return;
+        setActiveDatabase(response.data.active ?? null);
+        if (response.data.stored) {
+          setSettings((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  database: { ...(prev.database ?? {}), ...response.data.stored },
+                }
+              : prev
+          );
+        }
+        if (response.data.message) {
+          setDbState({ message: response.data.message, tone: 'success' });
+        }
+      } catch (error: any) {
+        if (cancelled) return;
+        const message =
+          error?.response?.data?.message ??
+          'Unable to load database status. Ensure MongoDB is running locally and accessible to the API server.';
+        setDbState({ message, tone: 'error' });
+      }
+    }
+    loadDatabaseStatus();
     return () => {
       cancelled = true;
     };
@@ -405,20 +442,6 @@ export default function AdminSettings() {
     );
   }
 
-  function updateDatabase(field: keyof DatabaseState, value: string) {
-    setSettings((prev) =>
-      prev
-        ? {
-            ...prev,
-            database: {
-              ...prev.database,
-              [field]: value,
-            },
-          }
-        : prev
-    );
-  }
-
   function mergeStorage(partial: Partial<StorageForm>) {
     setSettings((prev) => {
       if (!prev) return prev;
@@ -542,20 +565,31 @@ export default function AdminSettings() {
     }
   }
 
-  async function handleApplyDatabase() {
-    if (!database?.uri) {
-      setDbState({ message: 'Provide a MongoDB connection string before applying.', tone: 'error' });
-      return;
-    }
+  async function handleRefreshDatabase() {
     try {
       const response = await api.post('/admin/settings/database/apply', {
-        provider: database?.provider,
         uri: database?.uri,
         dbName: database?.dbName,
       });
-      setDbState({ message: `Database reconfigured to ${response.data.active?.uri}`, tone: 'success' });
-    } catch (error) {
-      setDbState({ message: 'Unable to connect to the provided database.', tone: 'error' });
+      setActiveDatabase(response.data.active ?? null);
+      if (response.data.stored) {
+        setSettings((prev) =>
+          prev
+            ? {
+                ...prev,
+                database: { ...(prev.database ?? {}), ...response.data.stored },
+              }
+            : prev
+        );
+      }
+      const message =
+        response.data.message ?? 'Local MongoDB connection verified successfully.';
+      setDbState({ message, tone: 'success' });
+    } catch (error: any) {
+      const message =
+        error?.response?.data?.message ??
+        'Unable to verify the local MongoDB connection. Confirm the database service is running and reachable.';
+      setDbState({ message, tone: 'error' });
     }
   }
 
@@ -1637,8 +1671,19 @@ export default function AdminSettings() {
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h2 className="text-xl font-semibold text-[var(--text)]">Database configuration</h2>
-          <p className="text-sm text-[var(--textMuted)]">Switch between local MongoDB deployments and managed MongoDB Atlas clusters, then migrate schemas instantly.</p>
+          <p className="text-sm text-[var(--textMuted)]">
+            The LMS API connects to a local MongoDB instance. Update the <code className="rounded bg-[var(--surface)] px-1 py-0.5 text-xs">MONGO_URI</code>
+            {' '}and <code className="rounded bg-[var(--surface)] px-1 py-0.5 text-xs">MONGO_DB</code> environment variables if you need to target a different
+            database and restart the API service afterwards.
+          </p>
         </div>
+        <button
+          type="button"
+          onClick={handleRefreshDatabase}
+          className="rounded-full bg-[var(--primary)] px-5 py-2 text-sm font-semibold text-white shadow-lg shadow-[var(--primary)]/30"
+        >
+          Check local database status
+        </button>
       </div>
 
       {dbState && (
@@ -1651,39 +1696,58 @@ export default function AdminSettings() {
         </div>
       )}
 
-      <div className="grid gap-4 md:grid-cols-3">
-        <select
-          value={database.provider || 'LOCAL'}
-          onChange={(e) => updateDatabase('provider', e.target.value)}
-          className="rounded-xl border border-[var(--border-soft)] bg-[var(--surface)]/80 px-4 py-2 text-sm"
-        >
-          <option value="LOCAL">Local MongoDB</option>
-          <option value="ATLAS">MongoDB Atlas</option>
-          <option value="CUSTOM">Custom connection</option>
-        </select>
-        <input
-          type="text"
-          value={database.uri || ''}
-          onChange={(e) => updateDatabase('uri', e.target.value)}
-          placeholder="mongodb+srv://user:pass@cluster.mongodb.net"
-          className="rounded-xl border border-[var(--border-soft)] bg-[var(--surface)]/80 px-4 py-2 text-sm"
-        />
-        <input
-          type="text"
-          value={database.dbName || ''}
-          onChange={(e) => updateDatabase('dbName', e.target.value)}
-          placeholder="Database name"
-          className="rounded-xl border border-[var(--border-soft)] bg-[var(--surface)]/80 px-4 py-2 text-sm"
-        />
+      <div className="grid gap-4 md:grid-cols-2">
+        <div className="rounded-2xl border border-[var(--border-soft)] bg-[var(--surface)]/80 p-5 text-sm">
+          <h3 className="text-sm font-semibold text-[var(--text)]">Connection string</h3>
+          <p className="mt-1 text-xs text-[var(--textMuted)]">Defined via the API server environment.</p>
+          <code className="mt-3 block break-all rounded-xl bg-[var(--surface)]/70 px-3 py-2 text-xs text-[var(--text)]">
+            {activeDatabase?.uri || database.uri || 'mongodb://127.0.0.1:27017'}
+          </code>
+        </div>
+        <div className="rounded-2xl border border-[var(--border-soft)] bg-[var(--surface)]/80 p-5 text-sm space-y-3">
+          <div>
+            <h3 className="text-sm font-semibold text-[var(--text)]">Database name</h3>
+            <p className="mt-1 text-xs text-[var(--textMuted)]">Configured with the <code className="rounded bg-[var(--surface)] px-1 py-0.5 text-xs">MONGO_DB</code> variable.</p>
+            <p className="mt-2 text-sm font-mono text-[var(--text)]">
+              {activeDatabase?.dbName || database.dbName || 'lms'}
+            </p>
+          </div>
+          <div>
+            <h3 className="text-sm font-semibold text-[var(--text)]">Provider</h3>
+            <p className="mt-1 text-xs text-[var(--textMuted)]">Dynamic switching is disabled to keep this deployment on the bundled database.</p>
+            <p className="mt-2 text-sm font-medium text-[var(--text)]">Local MongoDB</p>
+          </div>
+        </div>
       </div>
 
-      <button
-        type="button"
-        onClick={handleApplyDatabase}
-        className="rounded-full bg-[var(--primary)] px-5 py-2 text-sm font-semibold text-white shadow-lg shadow-[var(--primary)]/30"
-      >
-        Apply & run schema sync
-      </button>
+      {overview?.database && (
+        <div className="rounded-2xl border border-[var(--border-soft)] bg-[var(--surface)]/80 p-5 text-sm">
+          <h3 className="text-sm font-semibold text-[var(--text)]">Current database footprint</h3>
+          <dl className="mt-3 grid gap-2 text-xs text-[var(--textMuted)] sm:grid-cols-2 lg:grid-cols-4">
+            <div>
+              <dt>Collections</dt>
+              <dd className="font-medium text-[var(--text)]">{overview.database.collections ?? 0}</dd>
+            </div>
+            <div>
+              <dt>Documents</dt>
+              <dd className="font-medium text-[var(--text)]">{overview.database.objects ?? 0}</dd>
+            </div>
+            <div>
+              <dt>Data size (MB)</dt>
+              <dd className="font-medium text-[var(--text)]">{overview.database.dataSizeMb ?? 0}</dd>
+            </div>
+            <div>
+              <dt>Index size (MB)</dt>
+              <dd className="font-medium text-[var(--text)]">{overview.database.indexSizeMb ?? 0}</dd>
+            </div>
+          </dl>
+        </div>
+      )}
+
+      <p className="text-xs text-[var(--textMuted)]">
+        To move to a different MongoDB deployment later, stop the API container, update the environment variables, ensure the new
+        host allows local connections, and restart the stack.
+      </p>
     </section>
   );
 

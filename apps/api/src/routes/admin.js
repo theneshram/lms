@@ -61,7 +61,23 @@ router.get(
   requireRole('ADMIN'),
   asyncHandler(async (req, res) => {
     const settings = await SystemSetting.getSingleton();
-    res.json({ stored: settings.database, active: getCurrentDatabaseConfig() });
+    const active = getCurrentDatabaseConfig();
+    const stored = settings.database?.toObject?.() ?? settings.database ?? {};
+    const normalizedStored = {
+      ...stored,
+      provider: 'LOCAL',
+      uri: active.uri,
+      dbName: active.dbName,
+    };
+    if (!stored?.provider || stored.provider !== 'LOCAL' || stored.uri !== active.uri) {
+      settings.database = normalizedStored;
+      await settings.save();
+    }
+    res.json({
+      message: 'Database configuration is locked to the local MongoDB instance managed by the API environment.',
+      stored: normalizedStored,
+      active,
+    });
   })
 );
 
@@ -70,22 +86,39 @@ router.post(
   requireAuth,
   requireRole('ADMIN'),
   asyncHandler(async (req, res) => {
-    const { uri, dbName, provider } = req.body;
-    if (!uri) return res.status(400).json({ message: 'Database URI required' });
-
+    const { uri, dbName } = req.body ?? {};
     const settings = await SystemSetting.getSingleton();
+
+    try {
+      await reconnectDatabase({ uri, dbName });
+    } catch (error) {
+      if (error?.code === 'DB_SWITCH_DISABLED') {
+        return res.status(400).json({
+          message:
+            'This deployment uses the local MongoDB instance defined via environment variables. Update those values to change the connection.',
+          code: error.code,
+        });
+      }
+      throw error;
+    }
+
+    const active = getCurrentDatabaseConfig();
     settings.database = {
       ...(settings.database?.toObject?.() ?? settings.database ?? {}),
-      provider: provider ?? settings.database?.provider ?? 'CUSTOM',
-      uri,
-      dbName: dbName || settings.database?.dbName || 'lms',
+      provider: 'LOCAL',
+      uri: active.uri,
+      dbName: active.dbName,
       lastAppliedAt: new Date(),
       appliedBy: req.user._id,
     };
     await settings.save();
 
-    const active = await reconnectDatabase({ uri, dbName: settings.database.dbName });
-    res.json({ active, stored: settings.database });
+    res.json({
+      message:
+        'Database configuration confirmed. The API is connected to the local MongoDB instance defined by the environment variables.',
+      active,
+      stored: settings.database,
+    });
   })
 );
 

@@ -10,14 +10,25 @@ export function getCurrentDatabaseConfig() {
   return { ...currentConfig };
 }
 
-export async function reconnectDatabase({ uri, dbName }) {
-  if (!uri) throw new Error('Database URI is required');
-  await mongoose.disconnect();
-  await mongoose.connect(uri, { dbName });
-  currentConfig = { uri, dbName };
-  await syncAllIndexes();
-  console.log(`[DB] reconnected to ${uri} (dbName=${dbName})`);
-  return currentConfig;
+export async function reconnectDatabase({ uri, dbName } = {}) {
+  const requestedUri = uri ?? currentConfig.uri;
+  const requestedDbName = dbName ?? currentConfig.dbName;
+
+  if (requestedUri !== currentConfig.uri || requestedDbName !== currentConfig.dbName) {
+    const error = new Error(
+      'Dynamic database switching is disabled. Update the environment variables to change the MongoDB connection.'
+    );
+    error.code = 'DB_SWITCH_DISABLED';
+    throw error;
+  }
+
+  if (mongoose.connection.readyState !== 1) {
+    await mongoose.connect(currentConfig.uri, { dbName: currentConfig.dbName });
+    await syncAllIndexes();
+    console.log('[DB] ensured local MongoDB connection is active');
+  }
+
+  return getCurrentDatabaseConfig();
 }
 
 export async function syncAllIndexes() {
