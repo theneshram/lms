@@ -1,6 +1,6 @@
 import mongoose from 'mongoose';
 import { config } from './config.js';
-import { syncAllIndexes } from './utils/dbManager.js';
+import { syncAllIndexes, normalizeMongoError } from './utils/dbManager.js';
 
 export async function connectDB() {
   const uri = config.mongoUri;

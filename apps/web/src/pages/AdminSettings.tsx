@@ -129,7 +129,54 @@ type AdminOverview = {
   };
 };
 
-type DatabaseState = { provider?: string; uri?: string; dbName?: string };
+type DatabaseState = {
+  provider?: string;
+  uri?: string;
+  dbName?: string;
+  lastAppliedAt?: string;
+  lastConnectedAt?: string;
+  lastLatencyMs?: number | null;
+  lastErrorAt?: string;
+  lastErrorMessage?: string | null;
+  lastErrorCode?: string | null;
+};
+
+type DatabaseDiagnostics = {
+  uri?: string;
+  dbName?: string;
+  connected: boolean;
+  status?: 'connected' | 'disconnected';
+  message?: string;
+  readyState?: number;
+  host?: string;
+  port?: number;
+  user?: string;
+  pingMs?: number;
+  pingError?: string;
+  stats?: {
+    collections?: number;
+    objects?: number;
+    storageSizeMb?: number;
+    dataSizeMb?: number;
+    indexSizeMb?: number;
+    avgObjSizeKb?: number | null;
+  };
+  statsError?: string;
+  uptimeSeconds?: number;
+  connections?: { current?: number; available?: number; totalCreated?: number };
+  memory?: { residentMb?: number; virtualMb?: number; mappedMb?: number };
+  operationCounters?: {
+    insert?: number;
+    query?: number;
+    update?: number;
+    delete?: number;
+    getmore?: number;
+    command?: number;
+  };
+  network?: { bytesIn?: number; bytesOut?: number; numRequests?: number };
+  serverStatusError?: string;
+  lastCheckedAt: string;
+};
 
 type Settings = {
   appearance: AppearanceForm;
@@ -184,6 +231,33 @@ export default function AdminSettings() {
   );
   const [activeNav, setActiveNav] = useState(navSections[0].id);
 
+  const formatNumber = (value?: number | null) =>
+    typeof value === 'number' && !Number.isNaN(value) ? value.toLocaleString() : '—';
+
+  const formatBytes = (bytes?: number | null) => {
+    if (typeof bytes !== 'number' || Number.isNaN(bytes)) return '—';
+    if (bytes >= 1024 ** 3) return `${(bytes / 1024 ** 3).toFixed(2)} GB`;
+    if (bytes >= 1024 ** 2) return `${(bytes / 1024 ** 2).toFixed(2)} MB`;
+    if (bytes >= 1024) return `${(bytes / 1024).toFixed(2)} KB`;
+    return `${bytes.toFixed(0)} B`;
+  };
+
+  const formatMegabytes = (value?: number | null) => {
+    if (typeof value !== 'number' || Number.isNaN(value)) return '—';
+    if (value >= 1024) return `${(value / 1024).toFixed(2)} GB`;
+    return `${value.toFixed(2)} MB`;
+  };
+
+  const formatDuration = (seconds?: number | null) => {
+    if (typeof seconds !== 'number' || Number.isNaN(seconds) || seconds <= 0) return '—';
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = Math.floor(seconds % 60);
+    if (hours) return `${hours}h ${minutes}m`;
+    if (minutes) return `${minutes}m ${secs}s`;
+    return `${secs}s`;
+  };
+
   const refreshOverview = async () => {
     try {
       const response = await api.get<AdminOverview>('/admin/overview');
@@ -228,6 +302,28 @@ export default function AdminSettings() {
     return () => {
       cancelled = true;
     };
+  }, []);
+
+  const fetchDatabaseStatus = async () => {
+    setDbStatusLoading(true);
+    setDbStatusError(null);
+    try {
+      const response = await api.get<DatabaseDiagnostics>('/admin/settings/database/status');
+      setDbDiagnostics(response.data);
+      if (!response.data?.connected && response.data?.message) {
+        setDbStatusError(response.data.message);
+      }
+    } catch (error: any) {
+      const message = error?.response?.data?.message || 'Unable to retrieve database status. Check network access rules.';
+      setDbStatusError(message);
+      setDbDiagnostics(null);
+    } finally {
+      setDbStatusLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchDatabaseStatus();
   }, []);
 
   useEffect(() => {
@@ -1686,15 +1782,41 @@ export default function AdminSettings() {
         </button>
       </div>
 
-      {dbState && (
-        <div
-          className={`rounded-lg px-4 py-3 text-sm ${
-            dbState.tone === 'success' ? 'bg-emerald-500/10 text-emerald-600' : 'bg-rose-500/10 text-rose-600'
-          }`}
-        >
-          {dbState.message}
+        {dbState && (
+          <div
+            className={`rounded-lg px-4 py-3 text-sm ${
+              dbState.tone === 'success' ? 'bg-emerald-500/10 text-emerald-600' : 'bg-rose-500/10 text-rose-600'
+            }`}
+          >
+            {dbState.message}
+          </div>
+        )}
+
+        <div className="grid gap-4 md:grid-cols-3">
+          <select
+            value={database.provider || 'LOCAL'}
+            onChange={(e) => updateDatabase('provider', e.target.value)}
+            className="rounded-xl border border-[var(--border-soft)] bg-[var(--surface)]/80 px-4 py-2 text-sm"
+          >
+            <option value="LOCAL">Local MongoDB</option>
+            <option value="ATLAS">MongoDB Atlas</option>
+            <option value="CUSTOM">Custom connection</option>
+          </select>
+          <input
+            type="text"
+            value={database.uri || ''}
+            onChange={(e) => updateDatabase('uri', e.target.value)}
+            placeholder="mongodb+srv://user:pass@cluster.mongodb.net"
+            className="rounded-xl border border-[var(--border-soft)] bg-[var(--surface)]/80 px-4 py-2 text-sm"
+          />
+          <input
+            type="text"
+            value={database.dbName || ''}
+            onChange={(e) => updateDatabase('dbName', e.target.value)}
+            placeholder="Database name"
+            className="rounded-xl border border-[var(--border-soft)] bg-[var(--surface)]/80 px-4 py-2 text-sm"
+          />
         </div>
-      )}
 
       <div className="grid gap-4 md:grid-cols-2">
         <div className="rounded-2xl border border-[var(--border-soft)] bg-[var(--surface)]/80 p-5 text-sm">
