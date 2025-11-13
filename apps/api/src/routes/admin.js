@@ -12,7 +12,7 @@ import Enrollment from '../models/Enrollment.js';
 import VirtualSession from '../models/VirtualSession.js';
 import ActivityLog from '../models/ActivityLog.js';
 import { asyncHandler } from '../utils/error.js';
-import { getCurrentDatabaseConfig, reconnectDatabase } from '../utils/dbManager.js';
+import { getCurrentDatabaseConfig, reconnectDatabase, getDatabaseDiagnostics, normalizeMongoError } from '../utils/dbManager.js';
 import { refreshMailerCache, sendMail } from '../services/mailer.js';
 import { getStorageFootprint } from '../utils/storage.js';
 
@@ -81,11 +81,54 @@ router.post(
       dbName: dbName || settings.database?.dbName || 'lms',
       lastAppliedAt: new Date(),
       appliedBy: req.user._id,
+      lastErrorAt: null,
+      lastErrorMessage: null,
+      lastErrorCode: null,
     };
-    await settings.save();
+    try {
+      const diagnostics = await reconnectDatabase({ uri, dbName: settings.database.dbName });
+      if (diagnostics?.connected) {
+        settings.database.lastConnectedAt = new Date();
+        settings.database.lastLatencyMs = diagnostics?.pingMs ?? null;
+        settings.database.lastErrorAt = null;
+        settings.database.lastErrorMessage = null;
+        settings.database.lastErrorCode = null;
+      }
+      await settings.save();
+      res.json({ active: diagnostics, stored: settings.database });
+    } catch (error) {
+      const normalized = normalizeMongoError(error);
+      settings.database.lastErrorAt = new Date();
+      settings.database.lastErrorMessage = normalized.userMessage || normalized.message;
+      settings.database.lastErrorCode = normalized.code || null;
+      await settings.save();
+      return res.status(502).json({
+        message:
+          normalized.userMessage ||
+          'Unable to connect to the provided database. Verify credentials and network access.',
+        code: normalized.code || 'DB_CONNECTION_FAILED',
+      });
+    }
+  })
+);
 
-    const active = await reconnectDatabase({ uri, dbName: settings.database.dbName });
-    res.json({ active, stored: settings.database });
+router.get(
+  '/settings/database/status',
+  requireAuth,
+  requireRole('ADMIN'),
+  asyncHandler(async (req, res) => {
+    try {
+      const diagnostics = await getDatabaseDiagnostics();
+      res.json(diagnostics);
+    } catch (error) {
+      const normalized = normalizeMongoError(error);
+      res.status(502).json({
+        message:
+          normalized.userMessage ||
+          'Unable to retrieve database diagnostics. Confirm the database is reachable and IPs are whitelisted.',
+        code: normalized.code || 'DB_DIAGNOSTICS_FAILED',
+      });
+    }
   })
 );
 
