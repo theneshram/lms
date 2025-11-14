@@ -11,27 +11,6 @@ export function getCurrentDatabaseConfig() {
   return { ...currentConfig };
 }
 
-export async function reconnectDatabase({ uri, dbName } = {}) {
-  const requestedUri = uri ?? currentConfig.uri;
-  const requestedDbName = dbName ?? currentConfig.dbName;
-
-  if (requestedUri !== currentConfig.uri || requestedDbName !== currentConfig.dbName) {
-    const error = new Error(
-      'Dynamic database switching is disabled. Update the environment variables to change the MongoDB connection.'
-    );
-    error.code = 'DB_SWITCH_DISABLED';
-    throw error;
-  }
-
-  if (mongoose.connection.readyState !== 1) {
-    await mongoose.connect(currentConfig.uri, { dbName: currentConfig.dbName });
-    await syncAllIndexes();
-    console.log('[DB] ensured local MongoDB connection is active');
-  }
-
-  return getCurrentDatabaseConfig();
-}
-
 export async function syncAllIndexes() {
   const modelEntries = Object.values(mongoose.models);
   await Promise.all(modelEntries.map((model) => model.syncIndexes())).catch((err) =>
@@ -166,10 +145,33 @@ export async function getDatabaseDiagnostics() {
   return diagnostics;
 }
 
+export function normalizeMongoError(error) {
+  if (!error) {
+    return { message: 'Unknown MongoDB error', code: null };
+  }
+
+  const normalized = {
+    message: error.message ?? 'Database error',
+    code: error.code ?? null,
+  };
+
+  if (['MongoNetworkError', 'MongoServerSelectionError'].includes(error.name)) {
+    normalized.userMessage =
+      'Unable to connect to the database. Verify the host, port, and network access.';
+  } else if (error.code === 11000) {
+    normalized.userMessage = 'A duplicate value violates a unique constraint.';
+  } else if (error.userMessage) {
+    normalized.userMessage = error.userMessage;
+  }
+
+  return normalized;
+}
+
 export default {
   getCurrentDatabaseConfig,
   reconnectDatabase,
   syncAllIndexes,
   getDatabaseDiagnostics,
   testDatabaseConnection,
+  normalizeMongoError,
 };

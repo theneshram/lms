@@ -6,6 +6,8 @@ import Enrollment from '../models/Enrollment.js';
 import SystemSetting from '../models/SystemSetting.js';
 import { asyncHandler } from '../utils/error.js';
 import { queueNotification } from '../services/notificationScheduler.js';
+import Course from '../models/Course.js';
+import { channelsToList } from '../utils/courseBuilder.js';
 
 const router = Router();
 
@@ -78,8 +80,17 @@ async function queueSessionNotifications(session, actorId) {
   if (!notifications?.enabled) return;
   const settings = await SystemSetting.getSingleton();
   const defaults = settings.notifications ?? {};
-  const channels = notifications.channels?.length ? notifications.channels : defaults.defaultChannels;
-  const leadStart = defaults.eventStartLeadMinutes ?? 30;
+  const course = await Course.findById(session.course).select('notifications');
+  const courseSessionEvent = course?.notifications?.events?.sessionReminder ?? {};
+  const sessionEventDefaults = defaults.events?.sessionReminder ?? {};
+  const defaultChannels = sessionEventDefaults.channels ?? defaults.defaultChannels;
+  const channels = channelsToList(notifications.channels, courseSessionEvent.channels ?? defaultChannels);
+  const leadStart =
+    notifications.leadMinutes ??
+    courseSessionEvent.leadMinutes ??
+    sessionEventDefaults.leadMinutes ??
+    defaults.eventStartLeadMinutes ??
+    30;
   const leadEnd = defaults.eventEndLeadMinutes ?? 15;
   const enrollments = await Enrollment.find({ course: session.course, status: 'ACTIVE' }).select('user').populate('user');
   const participants = enrollments.map((en) => en.user).filter(Boolean);

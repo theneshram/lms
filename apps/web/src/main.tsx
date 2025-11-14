@@ -1,6 +1,6 @@
 ﻿import React from 'react';
 import ReactDOM from 'react-dom/client';
-import { createBrowserRouter, RouterProvider } from 'react-router-dom';
+import { Navigate, createBrowserRouter, RouterProvider } from 'react-router-dom';
 import './styles/index.css';
 import { AuthProvider } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
@@ -14,6 +14,11 @@ import Assignments from './pages/Assignments';
 import AssignmentSubmit from './pages/AssignmentSubmit';
 import QuizTake from './pages/QuizTake';
 import AdminSettings from './pages/AdminSettings';
+import AdminLayout from './pages/admin/AdminLayout';
+import AdminCourses from './pages/admin/AdminCourses';
+import AdminUsers from './pages/admin/AdminUsers';
+import AdminNotifications from './pages/admin/AdminNotifications';
+import AdminQuestionBank from './pages/admin/AdminQuestionBank';
 import ProtectedRoute from './components/ProtectedRoute';
 
 const router = createBrowserRouter([
@@ -26,7 +31,22 @@ const router = createBrowserRouter([
   { path: '/courses/:id/assignments', element: <ProtectedRoute><Assignments/></ProtectedRoute> },
   { path: '/assignments/:id/submit', element: <ProtectedRoute allow={["STUDENT"]}><AssignmentSubmit/></ProtectedRoute> },
   { path: '/quizzes/:id/take', element: <ProtectedRoute allow={["STUDENT"]}><QuizTake/></ProtectedRoute> },
-  { path: '/admin', element: <ProtectedRoute allow={["ADMIN", "SUPER_ADMIN"]}><AdminSettings/></ProtectedRoute> },
+  {
+    path: '/admin',
+    element: (
+      <ProtectedRoute allow={['ADMIN', 'SUPER_ADMIN']}>
+        <AdminLayout />
+      </ProtectedRoute>
+    ),
+    children: [
+      { index: true, element: <Navigate to="/admin/courses" replace /> },
+      { path: 'courses', element: <AdminCourses /> },
+      { path: 'users', element: <AdminUsers /> },
+      { path: 'settings', element: <AdminSettings embedded /> },
+      { path: 'notifications', element: <AdminNotifications /> },
+      { path: 'question-bank', element: <AdminQuestionBank /> },
+    ],
+  },
 ]);
 
 ReactDOM.createRoot(document.getElementById('root')!).render(

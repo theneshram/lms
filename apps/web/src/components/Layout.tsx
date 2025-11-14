@@ -6,7 +6,7 @@ import { useTheme } from '../context/ThemeContext';
 const navLinks = [
   { to: '/dashboard', label: 'Dashboard', protected: true },
   { to: '/courses', label: 'Courses', protected: true },
-  { to: '/admin', label: 'Admin', roles: ['ADMIN', 'SUPER_ADMIN'] as const },
+  { to: '/admin/courses', label: 'Admin', roles: ['ADMIN', 'SUPER_ADMIN'] as const },
 ];
 
 export default function Layout({ children }: { children: React.ReactNode }) {

@@ -1,6 +1,7 @@
 import Notification from '../models/Notification.js';
 import SystemSetting from '../models/SystemSetting.js';
 import { sendMail } from './mailer.js';
+import { channelsToList } from '../utils/courseBuilder.js';
 
 let intervalHandle = null;
 const POLL_INTERVAL_MS = 60 * 1000;
@@ -14,11 +15,11 @@ async function processDueNotifications() {
   if (!pending.length) return;
 
   const settings = await SystemSetting.getSingleton();
-  const defaultChannels = settings.notifications?.defaultChannels ?? ['EMAIL', 'IN_APP'];
+  const defaultChannels = channelsToList(settings.notifications?.defaultChannels);
 
   for (const notification of pending) {
     try {
-      const channels = notification.channels?.length ? notification.channels : defaultChannels;
+      const channels = channelsToList(notification.channels, defaultChannels);
       if (channels.includes('EMAIL') && notification.user?.email) {
         await sendMail({
           to: notification.user.email,

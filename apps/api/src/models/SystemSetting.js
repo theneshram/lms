@@ -138,11 +138,52 @@ const MailSchema = new mongoose.Schema(
   { _id: false }
 );
 
+const NotificationChannelSchema = new mongoose.Schema(
+  {
+    email: { type: Boolean, default: true },
+    sms: { type: Boolean, default: false },
+    inApp: { type: Boolean, default: true },
+  },
+  { _id: false }
+);
+
+const NotificationEventSettingSchema = new mongoose.Schema(
+  {
+    enabled: { type: Boolean, default: true },
+    channels: { type: NotificationChannelSchema, default: () => ({}) },
+    leadMinutes: { type: Number, default: 0 },
+  },
+  { _id: false }
+);
+
+function normalizeChannelObject(value) {
+  if (!value) return { email: true, sms: false, inApp: true };
+  if (Array.isArray(value)) {
+    return {
+      email: value.includes('EMAIL'),
+      sms: value.includes('SMS'),
+      inApp: value.includes('IN_APP'),
+    };
+  }
+  return {
+    email: value.email !== undefined ? Boolean(value.email) : true,
+    sms: Boolean(value.sms),
+    inApp: value.inApp !== undefined ? Boolean(value.inApp) : true,
+  };
+}
+
 const NotificationPreferenceSchema = new mongoose.Schema(
   {
     eventStartLeadMinutes: { type: Number, default: 30 },
     eventEndLeadMinutes: { type: Number, default: 15 },
-    defaultChannels: { type: [String], default: ['EMAIL', 'IN_APP'] },
+    defaultChannels: { type: NotificationChannelSchema, default: () => ({ email: true, sms: false, inApp: true }) },
+    userOverridesEnabled: { type: Boolean, default: true },
+    events: {
+      courseWelcome: { type: NotificationEventSettingSchema, default: () => ({}) },
+      assignmentDue: { type: NotificationEventSettingSchema, default: () => ({ leadMinutes: 120 }) },
+      sessionReminder: { type: NotificationEventSettingSchema, default: () => ({ leadMinutes: 30 }) },
+      announcement: { type: NotificationEventSettingSchema, default: () => ({}) },
+    },
   },
   { _id: false }
 );
@@ -491,6 +532,44 @@ SystemSettingSchema.statics.getSingleton = async function getSingleton() {
     }
     if (!existing.storage) {
       existing.storage = {};
+      await existing.save();
+    }
+    const currentNotifications = existing.notifications?.toObject?.() ?? existing.notifications ?? {};
+    const coercedChannels = normalizeChannelObject(currentNotifications.defaultChannels);
+    const events = currentNotifications.events ?? {};
+    const normalizedEvents = {
+      courseWelcome: {
+        enabled: events?.courseWelcome?.enabled !== false,
+        leadMinutes: events?.courseWelcome?.leadMinutes ?? 0,
+        channels: normalizeChannelObject(events?.courseWelcome?.channels),
+      },
+      assignmentDue: {
+        enabled: events?.assignmentDue?.enabled !== false,
+        leadMinutes: events?.assignmentDue?.leadMinutes ?? 120,
+        channels: normalizeChannelObject(events?.assignmentDue?.channels),
+      },
+      sessionReminder: {
+        enabled: events?.sessionReminder?.enabled !== false,
+        leadMinutes: events?.sessionReminder?.leadMinutes ?? 30,
+        channels: normalizeChannelObject(events?.sessionReminder?.channels),
+      },
+      announcement: {
+        enabled: events?.announcement?.enabled !== false,
+        leadMinutes: events?.announcement?.leadMinutes ?? 0,
+        channels: normalizeChannelObject(events?.announcement?.channels),
+      },
+    };
+    if (
+      !existing.notifications ||
+      Array.isArray(existing.notifications.defaultChannels) ||
+      JSON.stringify(existing.notifications.defaultChannels) !== JSON.stringify(coercedChannels) ||
+      !existing.notifications.events
+    ) {
+      existing.notifications = {
+        ...currentNotifications,
+        defaultChannels: coercedChannels,
+        events: normalizedEvents,
+      };
       await existing.save();
     }
     if (!existing.database?.provider) {
